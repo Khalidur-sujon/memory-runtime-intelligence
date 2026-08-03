@@ -1,29 +1,37 @@
-import type { Resource } from '../core';
-import type { ResourceIdentity } from '../core';
-import type { Registry } from './Registry';
+import { InMemoryEventBus } from '../events';
+import { RegistrySubscriber } from '../subscribers/RegistrySubscriber';
+import { WebSocketInstrumentation } from '../instrumentation/WebSocketInstrumentation';
+import { InMemoryRegistry } from '../registry/InMemoryRegistry';
+import type { Registry } from '../registry/Registry';
 
-export class InMemoryRegistry implements Registry {
-  private readonly resources = new Map<ResourceIdentity, Resource>();
+export class RuntimeContext {
+  private readonly registry: Registry;
 
-  register(resource: Resource): void {
-    this.resources.set(resource.id, resource);
+  private readonly eventBus: InMemoryEventBus;
+
+  private readonly websocketInstrumentation: WebSocketInstrumentation;
+
+  constructor() {
+    this.registry = new InMemoryRegistry();
+
+    this.eventBus = new InMemoryEventBus();
+
+    const registrySubscriber = new RegistrySubscriber(this.registry);
+
+    this.eventBus.subscribe(registrySubscriber);
+
+    this.websocketInstrumentation = new WebSocketInstrumentation(this.eventBus);
   }
 
-  release(id: ResourceIdentity): void {
-    const resource = this.resources.get(id);
-
-    if (!resource) {
-      return;
-    }
-
-    resource.state = 'released';
+  start(): void {
+    this.websocketInstrumentation.start();
   }
 
-  find(id: ResourceIdentity): Resource | undefined {
-    return this.resources.get(id);
+  stop(): void {
+    this.websocketInstrumentation.stop();
   }
 
-  list(): readonly Resource[] {
-    return Array.from(this.resources.values());
+  getRegistry(): Registry {
+    return this.registry;
   }
 }
