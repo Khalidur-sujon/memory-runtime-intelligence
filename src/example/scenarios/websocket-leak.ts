@@ -22,7 +22,11 @@ export function runWebSocketLeakScenario(runtime: RuntimeContext): void {
 
   console.log('After WebSocketCreatedEvent');
 
+  console.log('Registry:');
   console.log(runtime.getRegistry());
+
+  console.log('History:');
+  console.log(runtime.getHistory());
 
   // const closedEvent: WebSocketClosedEvent = {
   //   type: 'WebSocketClosed',
