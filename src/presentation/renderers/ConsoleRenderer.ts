@@ -16,7 +16,7 @@ export class ConsoleRenderer implements Renderer {
 
         lines.push('Created at:');
         lines.push(
-          `${finding.sourceLocation.file}:${finding.sourceLocation.line}`,
+          `${finding.sourceLocation.file}:${finding.sourceLocation.line}:${finding.sourceLocation.column}`,
         );
 
         if (finding.details) {

@@ -4,6 +4,7 @@ import type {
   WebSocketClosedEvent,
   WebSocketCreatedEvent,
 } from '../events';
+import { captureSourceLocation } from '../utils/SourceLocationCapture';
 import type { Instrumentation } from './Instrumentation';
 
 export class WebSocketInstrumentation implements Instrumentation {
@@ -34,11 +35,7 @@ export class WebSocketInstrumentation implements Instrumentation {
           timestamp: Date.now(),
           resourceId,
           url: args[0].toString(),
-          sourceLocation: {
-            file: 'src/example/scenarios/websocket-leak.ts',
-            line: 8,
-            column: 15,
-          },
+          sourceLocation: captureSourceLocation(),
         };
 
         publisher.publish(createdEvent);
