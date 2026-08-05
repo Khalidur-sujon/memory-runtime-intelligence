@@ -3,12 +3,17 @@ import type { Finding } from '../Finding';
 import type { Rule } from '../Rule';
 
 import type { WebSocketCreatedEvent, WebSocketClosedEvent } from '../../events';
-import { SourceLocation } from '../../core';
+import { ResourceType, SourceLocation } from '../../core';
+import { Confidence } from '../Confidence';
 
 interface LifecycleCounter {
   created: number;
   released: number;
 
+  // Resource kind (websocket, timer, etc.)
+  resourceType?: ResourceType;
+
+  // First place where the resource was created
   sourceLocation?: SourceLocation;
 }
 
@@ -25,6 +30,12 @@ export class ResourceLifecycleRule implements Rule {
 
           counter.created++;
 
+          // Save once for later recommendations
+          if (!counter.resourceType) {
+            counter.resourceType = 'websocket';
+          }
+
+          // Keep the first creation location
           if (!counter.sourceLocation) {
             counter.sourceLocation = createdEvent.sourceLocation;
           }
@@ -57,6 +68,10 @@ export class ResourceLifecycleRule implements Rule {
 
           message: 'Potential Memory Retention.',
 
+          confidence: this.calculateConfidence(counter),
+
+          recommendation: this.getRecommendation(counter),
+
           details: {
             created: counter.created,
             released: counter.released,
@@ -86,5 +101,27 @@ export class ResourceLifecycleRule implements Rule {
     }
 
     return counter;
+  }
+
+  private calculateConfidence(counter: LifecycleCounter): Confidence {
+    // Number of unreleased resources
+    const unreleased = counter.created - counter.released;
+
+    if (unreleased > 1) {
+      return Confidence.HIGH;
+    }
+
+    return Confidence.MEDIUM;
+  }
+
+  private getRecommendation(counter: LifecycleCounter): string {
+    // Give a fix based on the resource type
+    switch (counter.resourceType) {
+      case 'websocket':
+        return 'Call websocket.close() when the connection is no longer needed.';
+
+      default:
+        return 'Review the resource lifecycle and ensure it is properly released.';
+    }
   }
 }
