@@ -4,7 +4,7 @@ import type { Renderer } from './Renderer';
 export class Presentation {
   constructor(private readonly renderer: Renderer) {}
 
-  present(findings: Finding[]): string {
+  present(findings: readonly Finding[]): string {
     return this.renderer.render(findings);
   }
 }
