@@ -4,31 +4,32 @@ import { runWebSocketLeakScenario } from './scenarios/websocket-leak';
 
 import { Analyzer } from '../analysis/Analyzer';
 
-import { UnreleasedResourceRule } from '../analysis/rules/UnreleasedResourceRule';
-
 import type { AnalysisContext } from '../analysis/AnalysisContext';
+import { ResourceLifecycleRule } from '../analysis/rules/ResourceLifecycleRule';
+import { ConsoleRenderer, Presentation } from '../presentation';
 
 const runtime = new RuntimeContext();
 
 runtime.start();
 
-console.log('Runtime started');
-
 runWebSocketLeakScenario(runtime);
 
 const registry = runtime.getRegistry();
 
-const analyzer = new Analyzer([new UnreleasedResourceRule()]);
+const analyzer = new Analyzer([new ResourceLifecycleRule()]);
 
 const analysisContext: AnalysisContext = {
   resources: registry.list(),
+  history: runtime.getHistory(),
 };
 
 const findings = analyzer.analyze(analysisContext);
 
-console.log('Analysis Findings:');
+const presentation = new Presentation(new ConsoleRenderer());
 
-console.log(findings);
+console.log('\nAnalysis Report\n');
+
+console.log(presentation.present(findings));
 
 runtime.stop();
 

@@ -1,46 +1,16 @@
 import type { RuntimeContext } from '../../context/RuntimeContext';
-import type { WebSocketCreatedEvent, WebSocketClosedEvent } from '../../events';
 
-export function runWebSocketLeakScenario(runtime: RuntimeContext): void {
-  console.log('Running WebSocket lifecycle scenario...');
+export function runWebSocketLeakScenario(_runtime: RuntimeContext): void {
+  console.log('Running WebSocket lifecycle scenario...\n');
 
-  const resourceId = 'websocket-demo-001';
+  // WebSocket 1 (Properly closed)
+  const ws1 = new WebSocket('ws://example.com/1');
 
-  const createdEvent: WebSocketCreatedEvent = {
-    type: 'WebSocketCreated',
+  ws1.close();
 
-    resourceId,
+  // WebSocket 2 (Intentionally leaked)
+  const ws2 = new WebSocket('ws://example.com/2');
 
-    id: resourceId,
-
-    url: 'ws://example.com',
-
-    timestamp: Date.now(),
-  };
-
-  runtime.getEventBus().publish(createdEvent);
-
-  console.log('After WebSocketCreatedEvent');
-
-  console.log('Registry:');
-  console.log(runtime.getRegistry());
-
-  console.log('History:');
-  console.log(runtime.getHistory());
-
-  // const closedEvent: WebSocketClosedEvent = {
-  //   type: 'WebSocketClosed',
-
-  //   id: resourceId,
-
-  //   resourceId,
-
-  //   timestamp: Date.now(),
-  // };
-
-  // runtime.getEventBus().publish(closedEvent);
-
-  // console.log('After WebSocketClosedEvent');
-
-  // console.log(runtime.getRegistry());
+  // Prevent unused variable warning
+  void ws2;
 }
