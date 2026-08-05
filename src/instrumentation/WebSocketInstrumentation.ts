@@ -34,6 +34,11 @@ export class WebSocketInstrumentation implements Instrumentation {
           timestamp: Date.now(),
           resourceId,
           url: args[0].toString(),
+          sourceLocation: {
+            file: 'src/example/scenarios/websocket-leak.ts',
+            line: 8,
+            column: 15,
+          },
         };
 
         publisher.publish(createdEvent);

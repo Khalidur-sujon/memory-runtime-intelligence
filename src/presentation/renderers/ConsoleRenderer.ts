@@ -12,9 +12,15 @@ export class ConsoleRenderer implements Renderer {
         const lines: string[] = [];
 
         lines.push(`⚠ ${finding.message}`);
-        lines.push(`Resource: ${finding.resourceId}`);
+        lines.push('');
+
+        lines.push('Created at:');
+        lines.push(
+          `${finding.sourceLocation.file}:${finding.sourceLocation.line}`,
+        );
 
         if (finding.details) {
+          lines.push('');
           for (const [key, value] of Object.entries(finding.details)) {
             lines.push(`${this.formatLabel(key)}: ${value}`);
           }

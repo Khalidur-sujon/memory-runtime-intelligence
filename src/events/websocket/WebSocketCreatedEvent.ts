@@ -1,4 +1,4 @@
-import type { ResourceIdentity } from '../../core';
+import type { ResourceIdentity, SourceLocation } from '../../core';
 import { RuntimeEvent } from '../RuntimeEvents';
 
 export interface WebSocketCreatedEvent extends RuntimeEvent {
@@ -7,4 +7,6 @@ export interface WebSocketCreatedEvent extends RuntimeEvent {
   readonly resourceId: ResourceIdentity;
 
   readonly url: string;
+
+  readonly sourceLocation: SourceLocation;
 }

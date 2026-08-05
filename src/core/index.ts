@@ -4,3 +4,5 @@ export type {
   ResourceState,
   ResourceType,
 } from './Resource';
+
+export type { SourceLocation } from './SourceLocation';

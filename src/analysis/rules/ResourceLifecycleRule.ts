@@ -3,10 +3,13 @@ import type { Finding } from '../Finding';
 import type { Rule } from '../Rule';
 
 import type { WebSocketCreatedEvent, WebSocketClosedEvent } from '../../events';
+import { SourceLocation } from '../../core';
 
 interface LifecycleCounter {
   created: number;
   released: number;
+
+  sourceLocation?: SourceLocation;
 }
 
 export class ResourceLifecycleRule implements Rule {
@@ -21,6 +24,10 @@ export class ResourceLifecycleRule implements Rule {
           const counter = this.getCounter(lifecycle, createdEvent.resourceId);
 
           counter.created++;
+
+          if (!counter.sourceLocation) {
+            counter.sourceLocation = createdEvent.sourceLocation;
+          }
 
           break;
         }
@@ -41,6 +48,10 @@ export class ResourceLifecycleRule implements Rule {
 
     for (const [resourceId, counter] of lifecycle) {
       if (counter.created > counter.released) {
+        if (!counter.sourceLocation) {
+          continue;
+        }
+
         findings.push({
           resourceId,
 
@@ -50,6 +61,8 @@ export class ResourceLifecycleRule implements Rule {
             created: counter.created,
             released: counter.released,
           },
+
+          sourceLocation: counter.sourceLocation,
         });
       }
     }
