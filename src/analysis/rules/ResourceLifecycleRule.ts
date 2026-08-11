@@ -5,6 +5,8 @@ import type { Rule } from '../Rule';
 import type { WebSocketCreatedEvent, WebSocketClosedEvent } from '../../events';
 import { ResourceType, SourceLocation } from '../../core';
 import { Confidence } from '../Confidence';
+import { EventListenerAddedEvent } from '../../events/EventListener/EventListenerAddedEvent';
+import { EventListenerRemovedEvent } from '../../events/EventListener/EventListenerRemovedEvent';
 
 interface LifecycleCounter {
   created: number;
@@ -52,6 +54,33 @@ export class ResourceLifecycleRule implements Rule {
 
           break;
         }
+
+        case 'EventListenerAdded': {
+          const addedEvent = event as EventListenerAddedEvent;
+
+          const counter = this.getCounter(lifecycle, addedEvent.resourceId);
+
+          counter.created++;
+
+          if (!counter.resourceType) {
+            counter.resourceType = 'event-listener';
+          }
+
+          if (!counter.sourceLocation) {
+            counter.sourceLocation = addedEvent.sourceLocation;
+          }
+
+          break;
+        }
+        case 'EventListenerRemoved': {
+          const removedEvent = event as EventListenerRemovedEvent;
+
+          const counter = this.getCounter(lifecycle, removedEvent.resourceId);
+
+          counter.released++;
+
+          break;
+        }
       }
     }
 
@@ -65,6 +94,8 @@ export class ResourceLifecycleRule implements Rule {
 
         findings.push({
           resourceId,
+
+          resourceType: counter.resourceType!,
 
           message: 'Potential Memory Retention.',
 
@@ -119,6 +150,9 @@ export class ResourceLifecycleRule implements Rule {
     switch (counter.resourceType) {
       case 'websocket':
         return 'Call websocket.close() when the connection is no longer needed.';
+
+      case 'event-listener':
+        return 'Remove the event listener when it is no longer needed.';
 
       default:
         return 'Review the resource lifecycle and ensure it is properly released.';
