@@ -7,6 +7,8 @@ import type {
 import type { EventSubscriber } from '../events';
 import type { Registry } from '../registry';
 import type { Resource } from '../core';
+import { EventListenerAddedEvent } from '../events/EventListener/EventListenerAddedEvent';
+import { EventListenerRemovedEvent } from '../events/EventListener/EventListenerRemovedEvent';
 
 export class RegistrySubscriber implements EventSubscriber {
   constructor(private readonly registry: Registry) {}
@@ -31,6 +33,28 @@ export class RegistrySubscriber implements EventSubscriber {
         const websocketEvent = event as WebSocketClosedEvent;
 
         this.registry.release(websocketEvent.resourceId);
+
+        break;
+      }
+
+      case 'EventListenerAdded': {
+        const eventListenerEvent = event as EventListenerAddedEvent;
+
+        const resource: Resource = {
+          id: eventListenerEvent.resourceId,
+          type: 'event-listener',
+          state: 'observed',
+        };
+
+        this.registry.register(resource);
+
+        break;
+      }
+
+      case 'EventListenerRemoved': {
+        const eventListenerEvent = event as EventListenerRemovedEvent;
+
+        this.registry.release(eventListenerEvent.resourceId);
 
         break;
       }

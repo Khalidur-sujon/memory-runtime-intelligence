@@ -5,6 +5,7 @@ import { InMemoryRegistry } from '../registry';
 import type { Registry } from '../registry/Registry';
 import { InMemoryHistory, type History } from '../history';
 import { HistorySubscriber } from '../subscribers/HistorySubscriber';
+import { EventListenerInstrumentation } from '../instrumentation/EventListenerInstrumentation';
 
 export class RuntimeContext {
   private readonly registry: Registry;
@@ -14,6 +15,7 @@ export class RuntimeContext {
   private readonly eventBus: InMemoryEventBus;
 
   private readonly websocketInstrumentation: WebSocketInstrumentation;
+  private readonly eventListenerInstrumentation: EventListenerInstrumentation;
 
   constructor() {
     this.registry = new InMemoryRegistry();
@@ -30,14 +32,19 @@ export class RuntimeContext {
     this.eventBus.subscribe(historySubscriber);
 
     this.websocketInstrumentation = new WebSocketInstrumentation(this.eventBus);
+    this.eventListenerInstrumentation = new EventListenerInstrumentation(
+      this.eventBus,
+    );
   }
 
   start(): void {
     this.websocketInstrumentation.start();
+    this.eventListenerInstrumentation.start();
   }
 
   stop(): void {
     this.websocketInstrumentation.stop();
+    this.eventListenerInstrumentation.stop();
   }
 
   // For demo runner
