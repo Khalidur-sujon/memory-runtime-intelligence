@@ -7,12 +7,14 @@ import { Analyzer } from '../analysis/Analyzer';
 import type { AnalysisContext } from '../analysis/AnalysisContext';
 import { ResourceLifecycleRule } from '../analysis/rules/ResourceLifecycleRule';
 import { ConsoleRenderer, Presentation } from '../presentation';
+import { runEventListenerLeakScenario } from './scenarios/event-listener-leak';
 
 const runtime = new RuntimeContext();
 
 runtime.start();
 
 runWebSocketLeakScenario(runtime);
+runEventListenerLeakScenario(runtime);
 
 const registry = runtime.getRegistry();
 
