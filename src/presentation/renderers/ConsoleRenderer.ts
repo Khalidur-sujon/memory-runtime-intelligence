@@ -1,4 +1,5 @@
 import type { Finding } from '../../analysis';
+import { formatResourceType } from '../../utils/FormatResourceType';
 import type { Renderer } from '../Renderer';
 
 export class ConsoleRenderer implements Renderer {
@@ -50,6 +51,9 @@ export class ConsoleRenderer implements Renderer {
   // Render a single finding
   private renderFinding(finding: Finding): string {
     const lines: string[] = [];
+
+    lines.push(`Resource Type: ${formatResourceType(finding.resourceType)}`);
+    lines.push('');
 
     lines.push('Created at:');
     lines.push(
