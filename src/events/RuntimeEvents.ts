@@ -4,7 +4,9 @@ export type RuntimeEventType =
   | 'WebSocketCreated'
   | 'WebSocketClosed'
   | 'EventListenerAdded'
-  | 'EventListenerRemoved';
+  | 'EventListenerRemoved'
+  | 'TimerIntervalCreated'
+  | 'TimerIntervalReleased';
 
 export interface RuntimeEvent {
   readonly id: RuntimeEventId;
