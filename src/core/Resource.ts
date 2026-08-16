@@ -8,7 +8,8 @@ export type ResourceIdentity = string;
  *
  * This is intentionally open-ended to support custom adapters.
  */
-export type ResourceType = 'websocket' | 'timer' | 'event-listener';
+export type ResourceType =
+  'websocket' | 'timer' | 'event-listener' | 'timer-interval';
 
 /**
  * Represents the lifecycle state of a Resource.
