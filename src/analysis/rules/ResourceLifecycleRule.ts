@@ -7,6 +7,8 @@ import { ResourceType, SourceLocation } from '../../core';
 import { Confidence } from '../Confidence';
 import { EventListenerAddedEvent } from '../../events/EventListener/EventListenerAddedEvent';
 import { EventListenerRemovedEvent } from '../../events/EventListener/EventListenerRemovedEvent';
+import { TimerIntervalCreatedEvent } from '../../events/timer/EventListenerAddedEvent';
+import { TimerIntervalReleasedEvent } from '../../events/timer/EventListenerRemovedEvent';
 
 interface LifecycleCounter {
   created: number;
@@ -76,6 +78,33 @@ export class ResourceLifecycleRule implements Rule {
           const removedEvent = event as EventListenerRemovedEvent;
 
           const counter = this.getCounter(lifecycle, removedEvent.resourceId);
+
+          counter.released++;
+
+          break;
+        }
+
+        case 'TimerIntervalCreated': {
+          const createdEvent = event as TimerIntervalCreatedEvent;
+
+          const counter = this.getCounter(lifecycle, createdEvent.resourceId);
+
+          counter.created++;
+
+          if (!counter.resourceType) {
+            counter.resourceType = 'timer-interval';
+          }
+
+          if (!counter.sourceLocation) {
+            counter.sourceLocation = createdEvent.sourceLocation;
+          }
+
+          break;
+        }
+        case 'TimerIntervalReleased': {
+          const releasedEvent = event as TimerIntervalReleasedEvent;
+
+          const counter = this.getCounter(lifecycle, releasedEvent.resourceId);
 
           counter.released++;
 
@@ -153,6 +182,9 @@ export class ResourceLifecycleRule implements Rule {
 
       case 'event-listener':
         return 'Remove the event listener when it is no longer needed.';
+
+      case 'timer-interval':
+        return 'Call clearInterval() when the interval is no longer needed.';
 
       default:
         return 'Review the resource lifecycle and ensure it is properly released.';
