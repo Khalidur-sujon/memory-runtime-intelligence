@@ -9,6 +9,8 @@ import type { Registry } from '../registry';
 import type { Resource } from '../core';
 import { EventListenerAddedEvent } from '../events/EventListener/EventListenerAddedEvent';
 import { EventListenerRemovedEvent } from '../events/EventListener/EventListenerRemovedEvent';
+import { TimerIntervalCreatedEvent } from '../events/timer/EventListenerAddedEvent';
+import { TimerIntervalReleasedEvent } from '../events/timer/EventListenerRemovedEvent';
 
 export class RegistrySubscriber implements EventSubscriber {
   constructor(private readonly registry: Registry) {}
@@ -55,6 +57,28 @@ export class RegistrySubscriber implements EventSubscriber {
         const eventListenerEvent = event as EventListenerRemovedEvent;
 
         this.registry.release(eventListenerEvent.resourceId);
+
+        break;
+      }
+
+      case 'TimerIntervalCreated': {
+        const timerEvent = event as TimerIntervalCreatedEvent;
+
+        const resource: Resource = {
+          id: timerEvent.resourceId,
+          type: 'timer-interval',
+          state: 'observed',
+        };
+
+        this.registry.register(resource);
+
+        break;
+      }
+
+      case 'TimerIntervalReleased': {
+        const timerEvent = event as TimerIntervalReleasedEvent;
+
+        this.registry.release(timerEvent.resourceId);
 
         break;
       }
