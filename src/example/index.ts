@@ -14,7 +14,7 @@ const runtime = new RuntimeContext();
 
 runtime.start();
 
-runWebSocketLeakScenario(runtime);
+// runWebSocketLeakScenario(runtime);
 // runEventListenerLeakScenario(runtime);
 runTimerLeakScenario(runtime);
 

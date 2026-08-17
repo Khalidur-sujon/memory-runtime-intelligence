@@ -14,6 +14,9 @@ interface LifecycleCounter {
   created: number;
   released: number;
 
+  // Logical group of the resource
+  resourceGroupId: string;
+
   // Resource kind (websocket, timer, etc.)
   resourceType?: ResourceType;
 
@@ -27,67 +30,70 @@ export class ResourceLifecycleRule implements Rule {
 
     for (const event of context.history.getEvents()) {
       switch (event.type) {
-        case 'WebSocketCreated': {
-          const createdEvent = event as WebSocketCreatedEvent;
+        // case 'WebSocketCreated': {
+        //   const createdEvent = event as WebSocketCreatedEvent;
 
-          const counter = this.getCounter(lifecycle, createdEvent.resourceId);
+        //   const counter = this.getCounter(lifecycle, createdEvent.resourceId);
 
-          counter.created++;
+        //   counter.created++;
 
-          // Save once for later recommendations
-          if (!counter.resourceType) {
-            counter.resourceType = 'websocket';
-          }
+        //   // Save once for later recommendations
+        //   if (!counter.resourceType) {
+        //     counter.resourceType = 'websocket';
+        //   }
 
-          // Keep the first creation location
-          if (!counter.sourceLocation) {
-            counter.sourceLocation = createdEvent.sourceLocation;
-          }
+        //   // Keep the first creation location
+        //   if (!counter.sourceLocation) {
+        //     counter.sourceLocation = createdEvent.sourceLocation;
+        //   }
 
-          break;
-        }
+        //   break;
+        // }
 
-        case 'WebSocketClosed': {
-          const closedEvent = event as WebSocketClosedEvent;
+        // case 'WebSocketClosed': {
+        //   const closedEvent = event as WebSocketClosedEvent;
 
-          const counter = this.getCounter(lifecycle, closedEvent.resourceId);
+        //   const counter = this.getCounter(lifecycle, closedEvent.resourceId);
 
-          counter.released++;
+        //   counter.released++;
 
-          break;
-        }
+        //   break;
+        // }
 
-        case 'EventListenerAdded': {
-          const addedEvent = event as EventListenerAddedEvent;
+        // case 'EventListenerAdded': {
+        //   const addedEvent = event as EventListenerAddedEvent;
 
-          const counter = this.getCounter(lifecycle, addedEvent.resourceId);
+        //   const counter = this.getCounter(lifecycle, addedEvent.resourceId);
 
-          counter.created++;
+        //   counter.created++;
 
-          if (!counter.resourceType) {
-            counter.resourceType = 'event-listener';
-          }
+        //   if (!counter.resourceType) {
+        //     counter.resourceType = 'event-listener';
+        //   }
 
-          if (!counter.sourceLocation) {
-            counter.sourceLocation = addedEvent.sourceLocation;
-          }
+        //   if (!counter.sourceLocation) {
+        //     counter.sourceLocation = addedEvent.sourceLocation;
+        //   }
 
-          break;
-        }
-        case 'EventListenerRemoved': {
-          const removedEvent = event as EventListenerRemovedEvent;
+        //   break;
+        // }
+        // case 'EventListenerRemoved': {
+        //   const removedEvent = event as EventListenerRemovedEvent;
 
-          const counter = this.getCounter(lifecycle, removedEvent.resourceId);
+        //   const counter = this.getCounter(lifecycle, removedEvent.resourceId);
 
-          counter.released++;
+        //   counter.released++;
 
-          break;
-        }
+        //   break;
+        // }
 
         case 'TimerIntervalCreated': {
           const createdEvent = event as TimerIntervalCreatedEvent;
 
-          const counter = this.getCounter(lifecycle, createdEvent.resourceId);
+          const counter = this.getCounter(
+            lifecycle,
+            createdEvent.resourceGroupId,
+          );
 
           counter.created++;
 
@@ -104,7 +110,10 @@ export class ResourceLifecycleRule implements Rule {
         case 'TimerIntervalReleased': {
           const releasedEvent = event as TimerIntervalReleasedEvent;
 
-          const counter = this.getCounter(lifecycle, releasedEvent.resourceId);
+          const counter = this.getCounter(
+            lifecycle,
+            releasedEvent.resourceGroupId,
+          );
 
           counter.released++;
 
@@ -115,14 +124,16 @@ export class ResourceLifecycleRule implements Rule {
 
     const findings: Finding[] = [];
 
-    for (const [resourceId, counter] of lifecycle) {
+    for (const [resourceGroupId, counter] of lifecycle) {
+      const unreleased = counter.created - counter.released;
+
       if (counter.created > counter.released) {
         if (!counter.sourceLocation) {
           continue;
         }
 
         findings.push({
-          resourceId,
+          resourceGroupId,
 
           resourceType: counter.resourceType!,
 
@@ -135,6 +146,7 @@ export class ResourceLifecycleRule implements Rule {
           details: {
             created: counter.created,
             released: counter.released,
+            unreleased,
           },
 
           sourceLocation: counter.sourceLocation,
@@ -147,17 +159,18 @@ export class ResourceLifecycleRule implements Rule {
 
   private getCounter(
     lifecycle: Map<string, LifecycleCounter>,
-    resourceId: string,
+    resourceGroupId: string,
   ): LifecycleCounter {
-    let counter = lifecycle.get(resourceId);
+    let counter = lifecycle.get(resourceGroupId);
 
     if (!counter) {
       counter = {
         created: 0,
         released: 0,
+        resourceGroupId,
       };
 
-      lifecycle.set(resourceId, counter);
+      lifecycle.set(resourceGroupId, counter);
     }
 
     return counter;

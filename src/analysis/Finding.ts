@@ -2,7 +2,9 @@ import type { ResourceIdentity, ResourceType, SourceLocation } from '../core';
 import { Confidence } from './Confidence';
 
 export interface Finding {
-  readonly resourceId: ResourceIdentity;
+  // readonly resourceId: ResourceIdentity;
+
+  readonly resourceGroupId: ResourceIdentity;
 
   resourceType: ResourceType;
 

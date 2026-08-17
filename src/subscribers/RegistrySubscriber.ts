@@ -66,6 +66,7 @@ export class RegistrySubscriber implements EventSubscriber {
 
         const resource: Resource = {
           id: timerEvent.resourceId,
+          resourceGroupId: timerEvent.resourceGroupId,
           type: 'timer-interval',
           state: 'observed',
         };

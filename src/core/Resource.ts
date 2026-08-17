@@ -21,6 +21,7 @@ export type ResourceState = 'observed' | 'released' | 'archived';
  */
 export interface Resource {
   readonly id: ResourceIdentity;
+  readonly resourceGroupId?: ResourceIdentity | null;
   readonly type: ResourceType;
   state: ResourceState;
 }

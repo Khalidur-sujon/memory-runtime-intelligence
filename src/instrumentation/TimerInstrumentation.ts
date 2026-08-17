@@ -10,6 +10,11 @@ type IntervalHandle = ReturnType<typeof globalThis.setInterval>;
 
 type SetIntervalArgs = Parameters<typeof globalThis.setInterval>;
 
+interface IntervalResource {
+  resourceId: ResourceIdentity;
+  resourceGroupId: ResourceIdentity;
+}
+
 export class TimerInstrumentation implements Instrumentation {
   private readonly originalSetInterval = globalThis.setInterval;
 
@@ -17,7 +22,22 @@ export class TimerInstrumentation implements Instrumentation {
 
   private started = false;
 
-  private readonly intervals = new Map<IntervalHandle, ResourceIdentity>();
+  /**
+   * Tracks each actual runtime interval instance.
+   *
+   * intervalHandle -> resource identity
+   */
+  private readonly intervals = new Map<IntervalHandle, IntervalResource>();
+
+  /**
+   * Tracks logical resource groups.
+   *
+   * groupKey -> resourceGroupId
+   *
+   * The same source location gets the same resourceGroupId
+   * during the current runtime session.
+   */
+  private readonly resourceGroups = new Map<string, ResourceIdentity>();
 
   constructor(private readonly publisher: EventPublisher) {}
 
@@ -29,26 +49,62 @@ export class TimerInstrumentation implements Instrumentation {
     this.started = true;
 
     const originalSetInterval = this.originalSetInterval;
-
     const originalClearInterval = this.originalClearInterval;
 
     const publisher = this.publisher;
     const intervals = this.intervals;
+    const resourceGroups = this.resourceGroups;
 
     globalThis.setInterval = ((...args: SetIntervalArgs) => {
       const intervalId = originalSetInterval(...args);
 
+      /**
+       * Every actual interval instance gets a unique resourceId.
+       */
       const resourceId = crypto.randomUUID() as ResourceIdentity;
 
-      intervals.set(intervalId, resourceId);
+      /**
+       * Capture the creation location once.
+       *
+       * This location is also used to determine the logical
+       * resource group.
+       */
+      const sourceLocation = captureSourceLocation();
+
+      /**
+       * Same resource type + same source location
+       * = same logical resource group.
+       */
+      const groupKey = createGroupKey(sourceLocation);
+
+      let resourceGroupId = resourceGroups.get(groupKey);
+
+      /**
+       * First interval created from this location:
+       * create a new logical group.
+       *
+       * Later intervals from the same location:
+       * reuse the existing group id.
+       */
+      if (!resourceGroupId) {
+        resourceGroupId = crypto.randomUUID() as ResourceIdentity;
+
+        resourceGroups.set(groupKey, resourceGroupId);
+      }
+
+      intervals.set(intervalId, {
+        resourceId,
+        resourceGroupId,
+      });
 
       const createdEvent: TimerIntervalCreatedEvent = {
         id: crypto.randomUUID(),
         type: 'TimerIntervalCreated',
         timestamp: Date.now(),
         resourceId,
+        resourceGroupId,
         delay: extractDelay(args),
-        sourceLocation: captureSourceLocation(),
+        sourceLocation,
       };
 
       publisher.publish(createdEvent);
@@ -57,14 +113,15 @@ export class TimerInstrumentation implements Instrumentation {
     }) as typeof globalThis.setInterval;
 
     globalThis.clearInterval = ((intervalId: IntervalHandle) => {
-      const resourceId = intervals.get(intervalId);
+      const resource = intervals.get(intervalId);
 
-      if (resourceId) {
+      if (resource) {
         const releasedEvent: TimerIntervalReleasedEvent = {
           id: crypto.randomUUID(),
           type: 'TimerIntervalReleased',
           timestamp: Date.now(),
-          resourceId,
+          resourceId: resource.resourceId,
+          resourceGroupId: resource.resourceGroupId,
           sourceLocation: captureSourceLocation(),
         };
 
@@ -90,8 +147,23 @@ export class TimerInstrumentation implements Instrumentation {
 
     globalThis.clearInterval = this.originalClearInterval;
 
+    /**
+     * Interval instances belong to this runtime session.
+     */
     this.intervals.clear();
+
+    /**
+     * Logical groups also belong to this runtime session.
+     * They should not leak into the next runtime session.
+     */
+    this.resourceGroups.clear();
   }
+}
+
+function createGroupKey(
+  sourceLocation: ReturnType<typeof captureSourceLocation>,
+): string {
+  return `timer-interval:${JSON.stringify(sourceLocation)}`;
 }
 
 function extractDelay(args: SetIntervalArgs): number {

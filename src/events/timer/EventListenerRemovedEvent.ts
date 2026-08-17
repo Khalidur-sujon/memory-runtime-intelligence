@@ -6,5 +6,7 @@ export interface TimerIntervalReleasedEvent extends RuntimeEvent {
 
   readonly resourceId: ResourceIdentity;
 
+  readonly resourceGroupId: ResourceIdentity;
+
   readonly sourceLocation: SourceLocation;
 }

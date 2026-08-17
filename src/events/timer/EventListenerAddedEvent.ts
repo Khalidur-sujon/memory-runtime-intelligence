@@ -6,6 +6,8 @@ export interface TimerIntervalCreatedEvent extends RuntimeEvent {
 
   readonly resourceId: ResourceIdentity;
 
+  readonly resourceGroupId: ResourceIdentity;
+
   readonly delay: number;
 
   readonly sourceLocation: SourceLocation;

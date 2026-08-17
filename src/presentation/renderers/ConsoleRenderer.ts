@@ -53,6 +53,7 @@ export class ConsoleRenderer implements Renderer {
     const lines: string[] = [];
 
     lines.push(`Resource Type: ${formatResourceType(finding.resourceType)}`);
+    // lines.push(`Resource Group ID: ${finding.resourceGroupId}`);
     lines.push('');
 
     lines.push('Created at:');
