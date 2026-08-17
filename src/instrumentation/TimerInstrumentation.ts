@@ -169,5 +169,7 @@ function createGroupKey(
 function extractDelay(args: SetIntervalArgs): number {
   const delay = args[1];
 
-  return typeof delay === 'number' ? delay : 0;
+  return typeof delay === 'number' && Number.isFinite(delay)
+    ? Math.max(0, delay)
+    : 0;
 }
