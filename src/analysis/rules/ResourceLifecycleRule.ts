@@ -30,35 +30,41 @@ export class ResourceLifecycleRule implements Rule {
 
     for (const event of context.history.getEvents()) {
       switch (event.type) {
-        // case 'WebSocketCreated': {
-        //   const createdEvent = event as WebSocketCreatedEvent;
+        case 'WebSocketCreated': {
+          const createdEvent = event as WebSocketCreatedEvent;
 
-        //   const counter = this.getCounter(lifecycle, createdEvent.resourceId);
+          const counter = this.getCounter(
+            lifecycle,
+            createdEvent.resourceGroupId,
+          );
 
-        //   counter.created++;
+          counter.created++;
 
-        //   // Save once for later recommendations
-        //   if (!counter.resourceType) {
-        //     counter.resourceType = 'websocket';
-        //   }
+          // Save once for later recommendations
+          if (!counter.resourceType) {
+            counter.resourceType = 'websocket';
+          }
 
-        //   // Keep the first creation location
-        //   if (!counter.sourceLocation) {
-        //     counter.sourceLocation = createdEvent.sourceLocation;
-        //   }
+          // Keep the first creation location
+          if (!counter.sourceLocation) {
+            counter.sourceLocation = createdEvent.sourceLocation;
+          }
 
-        //   break;
-        // }
+          break;
+        }
 
-        // case 'WebSocketClosed': {
-        //   const closedEvent = event as WebSocketClosedEvent;
+        case 'WebSocketClosed': {
+          const closedEvent = event as WebSocketClosedEvent;
 
-        //   const counter = this.getCounter(lifecycle, closedEvent.resourceId);
+          const counter = this.getCounter(
+            lifecycle,
+            closedEvent.resourceGroupId,
+          );
 
-        //   counter.released++;
+          counter.released++;
 
-        //   break;
-        // }
+          break;
+        }
 
         // case 'EventListenerAdded': {
         //   const addedEvent = event as EventListenerAddedEvent;

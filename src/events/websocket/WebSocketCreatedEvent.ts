@@ -6,6 +6,8 @@ export interface WebSocketCreatedEvent extends RuntimeEvent {
 
   readonly resourceId: ResourceIdentity;
 
+  readonly resourceGroupId: ResourceIdentity;
+
   readonly url: string;
 
   readonly sourceLocation: SourceLocation;

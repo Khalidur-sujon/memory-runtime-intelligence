@@ -5,4 +5,5 @@ export interface WebSocketClosedEvent extends RuntimeEvent {
   readonly type: 'WebSocketClosed';
 
   readonly resourceId: ResourceIdentity;
+  readonly resourceGroupId: ResourceIdentity;
 }
