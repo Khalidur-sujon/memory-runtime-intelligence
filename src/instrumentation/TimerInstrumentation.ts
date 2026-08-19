@@ -2,6 +2,7 @@ import type { ResourceIdentity } from '../core';
 import type { EventPublisher } from '../events';
 import { TimerIntervalCreatedEvent } from '../events/timer/EventListenerAddedEvent';
 import { TimerIntervalReleasedEvent } from '../events/timer/EventListenerRemovedEvent';
+import { createResourceGroupKey } from '../utils/ResourceGroupKey';
 
 import { captureSourceLocation } from '../utils/SourceLocationCapture';
 import type { Instrumentation } from './Instrumentation';
@@ -75,7 +76,7 @@ export class TimerInstrumentation implements Instrumentation {
        * Same resource type + same source location
        * = same logical resource group.
        */
-      const groupKey = createGroupKey(sourceLocation);
+      const groupKey = createResourceGroupKey('timer-interval', sourceLocation);
 
       let resourceGroupId = resourceGroups.get(groupKey);
 
@@ -158,12 +159,6 @@ export class TimerInstrumentation implements Instrumentation {
      */
     this.resourceGroups.clear();
   }
-}
-
-function createGroupKey(
-  sourceLocation: ReturnType<typeof captureSourceLocation>,
-): string {
-  return `timer-interval:${JSON.stringify(sourceLocation)}`;
 }
 
 function extractDelay(args: SetIntervalArgs): number {

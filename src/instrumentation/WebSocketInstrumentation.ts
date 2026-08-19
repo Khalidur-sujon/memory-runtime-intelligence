@@ -4,6 +4,7 @@ import type {
   WebSocketClosedEvent,
   WebSocketCreatedEvent,
 } from '../events';
+import { createResourceGroupKey } from '../utils/ResourceGroupKey';
 import { captureSourceLocation } from '../utils/SourceLocationCapture';
 import type { Instrumentation } from './Instrumentation';
 
@@ -72,7 +73,7 @@ export class WebSocketInstrumentation implements Instrumentation {
          * Same resource type + same source location
          * = same logical resource group.
          */
-        const groupKey = createGroupKey(sourceLocation);
+        const groupKey = createResourceGroupKey('websocket', sourceLocation);
 
         let resourceGroupId = resourceGroups.get(groupKey);
 
@@ -154,10 +155,4 @@ export class WebSocketInstrumentation implements Instrumentation {
      */
     this.resourceGroups.clear();
   }
-}
-
-function createGroupKey(
-  sourceLocation: ReturnType<typeof captureSourceLocation>,
-): string {
-  return `websocket:${JSON.stringify(sourceLocation)}`;
 }
