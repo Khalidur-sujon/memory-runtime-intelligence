@@ -6,6 +6,8 @@ export interface EventListenerAddedEvent extends RuntimeEvent {
 
   readonly resourceId: ResourceIdentity;
 
+  readonly resourceGroupId: ResourceIdentity;
+
   readonly target: string;
 
   readonly eventType: string;

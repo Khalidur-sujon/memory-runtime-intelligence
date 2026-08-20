@@ -66,32 +66,38 @@ export class ResourceLifecycleRule implements Rule {
           break;
         }
 
-        // case 'EventListenerAdded': {
-        //   const addedEvent = event as EventListenerAddedEvent;
+        case 'EventListenerAdded': {
+          const addedEvent = event as EventListenerAddedEvent;
 
-        //   const counter = this.getCounter(lifecycle, addedEvent.resourceId);
+          const counter = this.getCounter(
+            lifecycle,
+            addedEvent.resourceGroupId,
+          );
 
-        //   counter.created++;
+          counter.created++;
 
-        //   if (!counter.resourceType) {
-        //     counter.resourceType = 'event-listener';
-        //   }
+          if (!counter.resourceType) {
+            counter.resourceType = 'event-listener';
+          }
 
-        //   if (!counter.sourceLocation) {
-        //     counter.sourceLocation = addedEvent.sourceLocation;
-        //   }
+          if (!counter.sourceLocation) {
+            counter.sourceLocation = addedEvent.sourceLocation;
+          }
 
-        //   break;
-        // }
-        // case 'EventListenerRemoved': {
-        //   const removedEvent = event as EventListenerRemovedEvent;
+          break;
+        }
+        case 'EventListenerRemoved': {
+          const removedEvent = event as EventListenerRemovedEvent;
 
-        //   const counter = this.getCounter(lifecycle, removedEvent.resourceId);
+          const counter = this.getCounter(
+            lifecycle,
+            removedEvent.resourceGroupId,
+          );
 
-        //   counter.released++;
+          counter.released++;
 
-        //   break;
-        // }
+          break;
+        }
 
         case 'TimerIntervalCreated': {
           const createdEvent = event as TimerIntervalCreatedEvent;

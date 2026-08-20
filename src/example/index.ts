@@ -14,9 +14,9 @@ const runtime = new RuntimeContext();
 
 runtime.start();
 
-runWebSocketLeakScenario(runtime);
-// runEventListenerLeakScenario(runtime);
-runTimerLeakScenario(runtime);
+// runWebSocketLeakScenario(runtime);
+runEventListenerLeakScenario(runtime);
+// runTimerLeakScenario(runtime);
 
 const registry = runtime.getRegistry();
 
