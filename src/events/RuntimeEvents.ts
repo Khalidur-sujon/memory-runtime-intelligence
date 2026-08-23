@@ -6,7 +6,10 @@ export type RuntimeEventType =
   | 'EventListenerAdded'
   | 'EventListenerRemoved'
   | 'TimerIntervalCreated'
-  | 'TimerIntervalReleased';
+  | 'TimerIntervalReleased'
+  | 'ObserverCreated'
+  | 'ObserverStarted'
+  | 'ObserverReleased';
 
 export interface RuntimeEvent {
   readonly id: RuntimeEventId;
