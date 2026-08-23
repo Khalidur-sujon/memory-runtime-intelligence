@@ -9,6 +9,9 @@ import { EventListenerAddedEvent } from '../../events/EventListener/EventListene
 import { EventListenerRemovedEvent } from '../../events/EventListener/EventListenerRemovedEvent';
 import { TimerIntervalCreatedEvent } from '../../events/timer/EventListenerAddedEvent';
 import { TimerIntervalReleasedEvent } from '../../events/timer/EventListenerRemovedEvent';
+import { ObserverReleasedEvent } from '../../events/observer/ObserverReleasedEvent';
+import { ObserverStartedEvent } from '../../events/observer/ObserverStartedEvent';
+import { ObserverCreatedEvent } from '../../events/observer/ObserverCreatedEvent';
 
 interface LifecycleCounter {
   created: number;
@@ -131,6 +134,55 @@ export class ResourceLifecycleRule implements Rule {
 
           break;
         }
+
+        case 'ObserverCreated': {
+          const createdEvent = event as ObserverCreatedEvent;
+
+          const counter = this.getCounter(
+            lifecycle,
+            createdEvent.resourceGroupId,
+          );
+
+          counter.created++;
+
+          if (!counter.resourceType) {
+            counter.resourceType = 'observer';
+          }
+
+          if (!counter.sourceLocation) {
+            counter.sourceLocation = createdEvent.sourceLocation;
+          }
+
+          break;
+        }
+        case 'ObserverStarted': {
+          const startedEvent = event as ObserverStartedEvent;
+
+          /**
+           * Started does not create a new resource.
+           *
+           * The Observer was already created before
+           * observe() was called.
+           *
+           * Therefore we do not increment created/released.
+           */
+          this.getCounter(lifecycle, startedEvent.resourceGroupId);
+
+          break;
+        }
+
+        case 'ObserverReleased': {
+          const releasedEvent = event as ObserverReleasedEvent;
+
+          const counter = this.getCounter(
+            lifecycle,
+            releasedEvent.resourceGroupId,
+          );
+
+          counter.released++;
+
+          break;
+        }
       }
     }
 
@@ -210,6 +262,9 @@ export class ResourceLifecycleRule implements Rule {
 
       case 'timer-interval':
         return 'Call clearInterval() when the interval is no longer needed.';
+
+      case 'observer':
+        return 'Call observer.disconnect() when the observer is no longer needed.';
 
       default:
         return 'Review the resource lifecycle and ensure it is properly released.';
