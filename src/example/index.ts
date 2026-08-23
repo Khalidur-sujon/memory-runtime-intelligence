@@ -9,14 +9,16 @@ import { ResourceLifecycleRule } from '../analysis/rules/ResourceLifecycleRule';
 import { ConsoleRenderer, Presentation } from '../presentation';
 import { runEventListenerLeakScenario } from './scenarios/event-listener-leak';
 import { runTimerLeakScenario } from './scenarios/timer-leak';
+import { runObserverLeakScenario } from './scenarios/observer-leak';
 
 const runtime = new RuntimeContext();
 
 runtime.start();
 
 // runWebSocketLeakScenario(runtime);
-runEventListenerLeakScenario(runtime);
+// runEventListenerLeakScenario(runtime);
 // runTimerLeakScenario(runtime);
+runObserverLeakScenario(runtime);
 
 const registry = runtime.getRegistry();
 
