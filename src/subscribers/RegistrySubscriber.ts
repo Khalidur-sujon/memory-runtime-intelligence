@@ -11,6 +11,9 @@ import { EventListenerAddedEvent } from '../events/EventListener/EventListenerAd
 import { EventListenerRemovedEvent } from '../events/EventListener/EventListenerRemovedEvent';
 import { TimerIntervalCreatedEvent } from '../events/timer/EventListenerAddedEvent';
 import { TimerIntervalReleasedEvent } from '../events/timer/EventListenerRemovedEvent';
+import { ObserverCreatedEvent } from '../events/observer/ObserverCreatedEvent';
+import { ObserverStartedEvent } from '../events/observer/ObserverStartedEvent';
+import { ObserverReleasedEvent } from '../events/observer/ObserverReleasedEvent';
 
 export class RegistrySubscriber implements EventSubscriber {
   constructor(private readonly registry: Registry) {}
@@ -80,6 +83,45 @@ export class RegistrySubscriber implements EventSubscriber {
         const timerEvent = event as TimerIntervalReleasedEvent;
 
         this.registry.release(timerEvent.resourceId);
+
+        break;
+      }
+
+      case 'ObserverCreated': {
+        const observerEvent = event as ObserverCreatedEvent;
+
+        const resource: Resource = {
+          id: observerEvent.resourceId,
+          resourceGroupId: observerEvent.resourceGroupId,
+          type: 'observer',
+          state: 'observed',
+        };
+
+        this.registry.register(resource);
+
+        break;
+      }
+
+      case 'ObserverStarted': {
+        const observerEvent = event as ObserverStartedEvent;
+
+        /**
+         * ObserverStarted does not create
+         * a new resource.
+         *
+         * The resource was already registered
+         * by ObserverCreated.
+         *
+         * So nothing needs to be done here.
+         */
+
+        break;
+      }
+
+      case 'ObserverReleased': {
+        const observerEvent = event as ObserverReleasedEvent;
+
+        this.registry.release(observerEvent.resourceId);
 
         break;
       }
