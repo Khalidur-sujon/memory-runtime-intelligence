@@ -1,7 +1,7 @@
 import type { ResourceIdentity } from '../core';
 import type { EventPublisher } from '../events';
-import { TimerIntervalCreatedEvent } from '../events/timer/EventListenerAddedEvent';
-import { TimerIntervalReleasedEvent } from '../events/timer/EventListenerRemovedEvent';
+import { TimerIntervalCreatedEvent } from '../events/timer/TimerIntervalCreatedEvent';
+import { TimerIntervalReleasedEvent } from '../events/timer/TimerIntervalReleasedEvent';
 import { createResourceGroupKey } from '../utils/ResourceGroupKey';
 
 import { captureSourceLocation } from '../utils/SourceLocationCapture';
