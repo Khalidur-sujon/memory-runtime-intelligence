@@ -8,4 +8,6 @@ export interface Registry {
   find(id: ResourceIdentity): Resource | undefined;
 
   list(): readonly Resource[];
+
+  clear(): void;
 }

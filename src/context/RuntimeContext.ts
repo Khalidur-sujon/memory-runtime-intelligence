@@ -8,6 +8,11 @@ import { HistorySubscriber } from '../subscribers/HistorySubscriber';
 import { EventListenerInstrumentation } from '../instrumentation/EventListenerInstrumentation';
 import { TimerInstrumentation } from '../instrumentation/TimerInstrumentation';
 import { ObserverInstrumentation } from '../instrumentation/ObserverInstrumentation';
+import { RuntimeSession } from '../runtime/RuntimeSession';
+import { RuntimeStorage } from '../runtime/RuntimeStorage';
+import { SnapshotScheduler } from '../runtime/SnapshotScheduler';
+import { RuntimeStaleDetector } from '../runtime/RuntimeStaleDetector';
+import { RuntimeStateChecker } from '../runtime/RuntimeStateChecker';
 
 export class RuntimeContext {
   private readonly registry: Registry;
@@ -20,6 +25,10 @@ export class RuntimeContext {
   private readonly eventListenerInstrumentation: EventListenerInstrumentation;
   private readonly timerInstrumentation: TimerInstrumentation;
   private readonly ObserverInstrumentation: ObserverInstrumentation;
+
+  private readonly session: RuntimeSession;
+  private readonly storage: RuntimeStorage;
+  private readonly snapshotScheduler: SnapshotScheduler;
 
   constructor() {
     this.registry = new InMemoryRegistry();
@@ -41,20 +50,56 @@ export class RuntimeContext {
     );
     this.timerInstrumentation = new TimerInstrumentation(this.eventBus);
     this.ObserverInstrumentation = new ObserverInstrumentation(this.eventBus);
+
+    this.session = new RuntimeSession();
+
+    this.storage = new RuntimeStorage();
+
+    this.snapshotScheduler = new SnapshotScheduler(
+      this.registry,
+      this.history,
+      this.storage,
+      this.session.getSessionId(),
+      this.session.getStartedAt(),
+    );
   }
 
-  start(): void {
+  async start(): Promise<void> {
+    const staleDetector = new RuntimeStaleDetector();
+
+    const stateChecker = new RuntimeStateChecker(this.storage, staleDetector);
+
+    const stale = await stateChecker.isStale();
+
+    if (stale) {
+      await this.storage.removeDirectory();
+    }
+
+    this.session.start();
+
     this.websocketInstrumentation.start();
     this.eventListenerInstrumentation.start();
     this.timerInstrumentation.start();
     this.ObserverInstrumentation.start();
+
+    this.snapshotScheduler.start();
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
+    this.snapshotScheduler.stop();
+
     this.websocketInstrumentation.stop();
     this.eventListenerInstrumentation.stop();
     this.timerInstrumentation.stop();
     this.timerInstrumentation.stop();
+
+    await this.storage.removeDirectory();
+
+    this.session.shutdown();
+  }
+
+  getSessionId(): string {
+    return this.session.getSessionId();
   }
 
   // For demo runner
@@ -70,5 +115,14 @@ export class RuntimeContext {
   // For demo runner
   getHistory(): History {
     return this.history;
+  }
+
+  async reset(): Promise<void> {
+    this.registry.clear();
+    this.history.clear();
+
+    await this.storage.clearSnapshot();
+
+    this.session.reset();
   }
 }

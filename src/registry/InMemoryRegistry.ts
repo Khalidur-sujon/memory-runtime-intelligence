@@ -32,4 +32,8 @@ export class InMemoryRegistry implements Registry {
       (resource) => resource.state !== 'released',
     );
   }
+
+  clear(): void {
+    this.resources.clear();
+  }
 }
