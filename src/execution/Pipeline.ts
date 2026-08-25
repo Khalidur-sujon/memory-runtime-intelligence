@@ -1,10 +1,12 @@
 import { AnalysisContext, Analyzer } from '../analysis';
+import { History } from '../history';
 import { Renderer } from '../presentation';
 import { Registry } from '../registry';
 
 export class Pipeline {
   constructor(
     private readonly registry: Registry,
+    private readonly history: History,
     private readonly analyzer: Analyzer,
     private readonly renderer: Renderer,
   ) {}
@@ -16,6 +18,7 @@ export class Pipeline {
     // 2. Create analysis contexts
     const context: AnalysisContext = {
       resources,
+      history: this.history,
     };
 
     // 3. Analyze
