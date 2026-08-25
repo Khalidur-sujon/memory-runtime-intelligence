@@ -10,15 +10,32 @@ import { ConsoleRenderer, Presentation } from '../presentation';
 import { runEventListenerLeakScenario } from './scenarios/event-listener-leak';
 import { runTimerLeakScenario } from './scenarios/timer-leak';
 import { runObserverLeakScenario } from './scenarios/observer-leak';
+import { RuntimeSession } from '../runtime/RuntimeSession';
+import { RuntimeStorage } from '../runtime/RuntimeStorage';
+import { SnapshotScheduler } from '../runtime/SnapshotScheduler';
+import { RuntimeStaleDetector } from '../runtime/RuntimeStaleDetector';
+import { RuntimeStateChecker } from '../runtime/RuntimeStateChecker';
 
 const runtime = new RuntimeContext();
 
-runtime.start();
+await runtime.start();
 
 // runWebSocketLeakScenario(runtime);
 // runEventListenerLeakScenario(runtime);
 // runTimerLeakScenario(runtime);
 runObserverLeakScenario(runtime);
+
+await new Promise((resolve) => setTimeout(resolve, 1500));
+
+// ----------------- test----------
+const storage = new RuntimeStorage();
+
+const staleDetector = new RuntimeStaleDetector();
+
+const checker = new RuntimeStateChecker(storage, staleDetector);
+
+console.log('Runtime stale:', await checker.isStale());
+// ---------------------------
 
 const registry = runtime.getRegistry();
 
@@ -37,6 +54,6 @@ console.log('\nAnalysis Report\n');
 
 console.log(presentation.present(findings));
 
-runtime.stop();
+// await runtime.stop();
 
 console.log('Runtime stopped');
