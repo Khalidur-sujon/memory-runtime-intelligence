@@ -1,6 +1,9 @@
 {
   "name": "memory-runtime-intelligence",
   "version": "0.0.1",
+  "bin": {
+    "memory-runtime-intelligence": "./dist/cli.js"
+  },
   "description": "Runtime resource retention detection for web applications.",
   "type": "module",
   "main": "./dist/index.cjs",
