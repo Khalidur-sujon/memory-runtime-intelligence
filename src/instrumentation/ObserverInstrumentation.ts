@@ -1,10 +1,13 @@
 import type { ResourceIdentity } from '../core';
 import type { EventPublisher } from '../events';
+
 import { ObserverCreatedEvent } from '../events/observer/ObserverCreatedEvent';
 import { ObserverReleasedEvent } from '../events/observer/ObserverReleasedEvent';
 import { ObserverStartedEvent } from '../events/observer/ObserverStartedEvent';
+
 import { createResourceGroupKey } from '../utils/ResourceGroupKey';
 import { captureSourceLocation } from '../utils/SourceLocationCapture';
+
 import type { Instrumentation } from './Instrumentation';
 
 type ObserverType = 'mutation' | 'resize' | 'intersection';
@@ -16,9 +19,7 @@ interface ObserverResource {
 
 export class ObserverInstrumentation implements Instrumentation {
   private readonly originalMutationObserver = globalThis.MutationObserver;
-
   private readonly originalResizeObserver = globalThis.ResizeObserver;
-
   private readonly originalIntersectionObserver =
     globalThis.IntersectionObserver;
 
@@ -128,171 +129,186 @@ export class ObserverInstrumentation implements Instrumentation {
 
     /**
      * MutationObserver
+     *
+     * Only patch when MutationObserver actually
+     * exists in the current runtime.
      */
-    class PatchedMutationObserver extends OriginalMutationObserver {
-      constructor(
-        ...args: ConstructorParameters<typeof OriginalMutationObserver>
-      ) {
-        super(...args);
+    if (OriginalMutationObserver) {
+      class PatchedMutationObserver extends OriginalMutationObserver {
+        constructor(
+          ...args: ConstructorParameters<typeof OriginalMutationObserver>
+        ) {
+          super(...args);
 
-        createObserverResource(this, 'mutation');
-      }
-
-      observe(target: Node, options?: MutationObserverInit): void {
-        const resource = observers.get(this);
-
-        if (resource) {
-          const startedEvent: ObserverStartedEvent = {
-            id: crypto.randomUUID(),
-            type: 'ObserverStarted',
-            timestamp: Date.now(),
-            resourceId: resource.resourceId,
-            resourceGroupId: resource.resourceGroupId,
-            observerType: 'mutation',
-            target: target.constructor.name,
-          };
-
-          publisher.publish(startedEvent);
+          createObserverResource(this, 'mutation');
         }
 
-        return super.observe(target, options);
-      }
+        observe(target: Node, options?: MutationObserverInit): void {
+          const resource = observers.get(this);
 
-      disconnect(): void {
-        const resource = observers.get(this);
+          if (resource) {
+            const startedEvent: ObserverStartedEvent = {
+              id: crypto.randomUUID(),
+              type: 'ObserverStarted',
+              timestamp: Date.now(),
+              resourceId: resource.resourceId,
+              resourceGroupId: resource.resourceGroupId,
+              observerType: 'mutation',
+              target: target.constructor.name,
+            };
 
-        if (resource) {
-          const releasedEvent: ObserverReleasedEvent = {
-            id: crypto.randomUUID(),
-            type: 'ObserverReleased',
-            timestamp: Date.now(),
-            resourceId: resource.resourceId,
-            resourceGroupId: resource.resourceGroupId,
-            observerType: 'mutation',
-          };
+            publisher.publish(startedEvent);
+          }
 
-          publisher.publish(releasedEvent);
-
-          observers.delete(this);
+          return super.observe(target, options);
         }
 
-        return super.disconnect();
+        disconnect(): void {
+          const resource = observers.get(this);
+
+          if (resource) {
+            const releasedEvent: ObserverReleasedEvent = {
+              id: crypto.randomUUID(),
+              type: 'ObserverReleased',
+              timestamp: Date.now(),
+              resourceId: resource.resourceId,
+              resourceGroupId: resource.resourceGroupId,
+              observerType: 'mutation',
+            };
+
+            publisher.publish(releasedEvent);
+
+            observers.delete(this);
+          }
+
+          return super.disconnect();
+        }
       }
+
+      globalThis.MutationObserver = PatchedMutationObserver;
     }
 
     /**
      * ResizeObserver
+     *
+     * Only patch when ResizeObserver actually
+     * exists in the current runtime.
      */
-    class PatchedResizeObserver extends OriginalResizeObserver {
-      constructor(
-        ...args: ConstructorParameters<typeof OriginalResizeObserver>
-      ) {
-        super(...args);
+    if (OriginalResizeObserver) {
+      class PatchedResizeObserver extends OriginalResizeObserver {
+        constructor(
+          ...args: ConstructorParameters<typeof OriginalResizeObserver>
+        ) {
+          super(...args);
 
-        createObserverResource(this, 'resize');
-      }
-
-      observe(target: Element, options?: ResizeObserverOptions): void {
-        const resource = observers.get(this);
-
-        if (resource) {
-          const startedEvent: ObserverStartedEvent = {
-            id: crypto.randomUUID(),
-            type: 'ObserverStarted',
-            timestamp: Date.now(),
-            resourceId: resource.resourceId,
-            resourceGroupId: resource.resourceGroupId,
-            observerType: 'resize',
-            target: target.constructor.name,
-          };
-
-          publisher.publish(startedEvent);
+          createObserverResource(this, 'resize');
         }
 
-        return super.observe(target, options);
-      }
+        observe(target: Element, options?: ResizeObserverOptions): void {
+          const resource = observers.get(this);
 
-      disconnect(): void {
-        const resource = observers.get(this);
+          if (resource) {
+            const startedEvent: ObserverStartedEvent = {
+              id: crypto.randomUUID(),
+              type: 'ObserverStarted',
+              timestamp: Date.now(),
+              resourceId: resource.resourceId,
+              resourceGroupId: resource.resourceGroupId,
+              observerType: 'resize',
+              target: target.constructor.name,
+            };
 
-        if (resource) {
-          const releasedEvent: ObserverReleasedEvent = {
-            id: crypto.randomUUID(),
-            type: 'ObserverReleased',
-            timestamp: Date.now(),
-            resourceId: resource.resourceId,
-            resourceGroupId: resource.resourceGroupId,
-            observerType: 'resize',
-          };
+            publisher.publish(startedEvent);
+          }
 
-          publisher.publish(releasedEvent);
-
-          observers.delete(this);
+          return super.observe(target, options);
         }
 
-        return super.disconnect();
+        disconnect(): void {
+          const resource = observers.get(this);
+
+          if (resource) {
+            const releasedEvent: ObserverReleasedEvent = {
+              id: crypto.randomUUID(),
+              type: 'ObserverReleased',
+              timestamp: Date.now(),
+              resourceId: resource.resourceId,
+              resourceGroupId: resource.resourceGroupId,
+              observerType: 'resize',
+            };
+
+            publisher.publish(releasedEvent);
+
+            observers.delete(this);
+          }
+
+          return super.disconnect();
+        }
       }
+
+      globalThis.ResizeObserver = PatchedResizeObserver;
     }
 
     /**
      * IntersectionObserver
+     *
+     * Only patch when IntersectionObserver actually
+     * exists in the current runtime.
      */
-    class PatchedIntersectionObserver extends OriginalIntersectionObserver {
-      constructor(
-        ...args: ConstructorParameters<typeof OriginalIntersectionObserver>
-      ) {
-        super(...args);
+    if (OriginalIntersectionObserver) {
+      class PatchedIntersectionObserver extends OriginalIntersectionObserver {
+        constructor(
+          ...args: ConstructorParameters<typeof OriginalIntersectionObserver>
+        ) {
+          super(...args);
 
-        createObserverResource(this, 'intersection');
-      }
-
-      observe(target: Element): void {
-        const resource = observers.get(this);
-
-        if (resource) {
-          const startedEvent: ObserverStartedEvent = {
-            id: crypto.randomUUID(),
-            type: 'ObserverStarted',
-            timestamp: Date.now(),
-            resourceId: resource.resourceId,
-            resourceGroupId: resource.resourceGroupId,
-            observerType: 'intersection',
-            target: target.constructor.name,
-          };
-
-          publisher.publish(startedEvent);
+          createObserverResource(this, 'intersection');
         }
 
-        return super.observe(target);
-      }
+        observe(target: Element): void {
+          const resource = observers.get(this);
 
-      disconnect(): void {
-        const resource = observers.get(this);
+          if (resource) {
+            const startedEvent: ObserverStartedEvent = {
+              id: crypto.randomUUID(),
+              type: 'ObserverStarted',
+              timestamp: Date.now(),
+              resourceId: resource.resourceId,
+              resourceGroupId: resource.resourceGroupId,
+              observerType: 'intersection',
+              target: target.constructor.name,
+            };
 
-        if (resource) {
-          const releasedEvent: ObserverReleasedEvent = {
-            id: crypto.randomUUID(),
-            type: 'ObserverReleased',
-            timestamp: Date.now(),
-            resourceId: resource.resourceId,
-            resourceGroupId: resource.resourceGroupId,
-            observerType: 'intersection',
-          };
+            publisher.publish(startedEvent);
+          }
 
-          publisher.publish(releasedEvent);
-
-          observers.delete(this);
+          return super.observe(target);
         }
 
-        return super.disconnect();
+        disconnect(): void {
+          const resource = observers.get(this);
+
+          if (resource) {
+            const releasedEvent: ObserverReleasedEvent = {
+              id: crypto.randomUUID(),
+              type: 'ObserverReleased',
+              timestamp: Date.now(),
+              resourceId: resource.resourceId,
+              resourceGroupId: resource.resourceGroupId,
+              observerType: 'intersection',
+            };
+
+            publisher.publish(releasedEvent);
+
+            observers.delete(this);
+          }
+
+          return super.disconnect();
+        }
       }
+
+      globalThis.IntersectionObserver = PatchedIntersectionObserver;
     }
-
-    globalThis.MutationObserver = PatchedMutationObserver;
-
-    globalThis.ResizeObserver = PatchedResizeObserver;
-
-    globalThis.IntersectionObserver = PatchedIntersectionObserver;
   }
 
   stop(): void {
@@ -302,6 +318,9 @@ export class ObserverInstrumentation implements Instrumentation {
 
     this.started = false;
 
+    /**
+     * Restore the original runtime APIs.
+     */
     globalThis.MutationObserver = this.originalMutationObserver;
 
     globalThis.ResizeObserver = this.originalResizeObserver;
