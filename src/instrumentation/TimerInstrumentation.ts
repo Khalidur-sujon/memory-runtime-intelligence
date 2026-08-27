@@ -6,6 +6,7 @@ import { createResourceGroupKey } from '../utils/ResourceGroupKey';
 
 import { captureSourceLocation } from '../utils/SourceLocationCapture';
 import type { Instrumentation } from './Instrumentation';
+import { InstrumentationScope } from './InstrumentationScope';
 
 type IntervalHandle = ReturnType<typeof globalThis.setInterval>;
 
@@ -40,7 +41,10 @@ export class TimerInstrumentation implements Instrumentation {
    */
   private readonly resourceGroups = new Map<string, ResourceIdentity>();
 
-  constructor(private readonly publisher: EventPublisher) {}
+  constructor(
+    private readonly publisher: EventPublisher,
+    private readonly scope: InstrumentationScope,
+  ) {}
 
   start(): void {
     if (this.started) {
@@ -53,11 +57,16 @@ export class TimerInstrumentation implements Instrumentation {
     const originalClearInterval = this.originalClearInterval;
 
     const publisher = this.publisher;
+    const scope = this.scope;
     const intervals = this.intervals;
     const resourceGroups = this.resourceGroups;
 
     globalThis.setInterval = ((...args: SetIntervalArgs) => {
       const intervalId = originalSetInterval(...args);
+
+      if (scope.isInternal()) {
+        return intervalId;
+      }
 
       /**
        * Every actual interval instance gets a unique resourceId.

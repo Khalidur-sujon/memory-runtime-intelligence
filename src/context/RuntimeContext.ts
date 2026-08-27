@@ -13,6 +13,7 @@ import { RuntimeStorage } from '../runtime/RuntimeStorage';
 import { SnapshotScheduler } from '../runtime/SnapshotScheduler';
 import { RuntimeStaleDetector } from '../runtime/RuntimeStaleDetector';
 import { RuntimeStateChecker } from '../runtime/RuntimeStateChecker';
+import { InstrumentationScope } from '../instrumentation/InstrumentationScope';
 
 export class RuntimeContext {
   private readonly registry: Registry;
@@ -29,6 +30,7 @@ export class RuntimeContext {
   private readonly session: RuntimeSession;
   private readonly storage: RuntimeStorage;
   private readonly snapshotScheduler: SnapshotScheduler;
+  private readonly instrumentationScope: InstrumentationScope;
 
   constructor() {
     this.registry = new InMemoryRegistry();
@@ -36,6 +38,8 @@ export class RuntimeContext {
     this.history = new InMemoryHistory();
 
     this.eventBus = new InMemoryEventBus();
+
+    this.instrumentationScope = new InstrumentationScope();
 
     const registrySubscriber = new RegistrySubscriber(this.registry);
 
@@ -48,7 +52,11 @@ export class RuntimeContext {
     this.eventListenerInstrumentation = new EventListenerInstrumentation(
       this.eventBus,
     );
-    this.timerInstrumentation = new TimerInstrumentation(this.eventBus);
+
+    this.timerInstrumentation = new TimerInstrumentation(
+      this.eventBus,
+      this.instrumentationScope,
+    );
     this.ObserverInstrumentation = new ObserverInstrumentation(this.eventBus);
 
     this.session = new RuntimeSession();
@@ -82,7 +90,13 @@ export class RuntimeContext {
     this.timerInstrumentation.start();
     this.ObserverInstrumentation.start();
 
-    this.snapshotScheduler.start();
+    this.instrumentationScope.enterInternal();
+
+    try {
+      this.snapshotScheduler.start();
+    } finally {
+      this.instrumentationScope.exitInternal();
+    }
   }
 
   async stop(): Promise<void> {
@@ -90,7 +104,6 @@ export class RuntimeContext {
 
     this.websocketInstrumentation.stop();
     this.eventListenerInstrumentation.stop();
-    this.timerInstrumentation.stop();
     this.timerInstrumentation.stop();
 
     await this.storage.removeDirectory();
