@@ -1,12 +1,12 @@
 import { History } from '../history';
 import type { Registry } from '../registry/Registry';
 import { createRuntimeSnapshot } from './createRuntimeSnapshot';
-import type { RuntimeStorage } from './RuntimeStorage';
+import type { RuntimeSnapshotTransport } from './RuntimeSnapshotTransport';
 
 export class SnapshotScheduler {
   private readonly registry: Registry;
   private readonly history: History;
-  private readonly storage: RuntimeStorage;
+  private readonly transport: RuntimeSnapshotTransport;
   private readonly sessionId: string;
   private readonly startedAt: number;
 
@@ -15,13 +15,13 @@ export class SnapshotScheduler {
   constructor(
     registry: Registry,
     history: History,
-    storage: RuntimeStorage,
+    transport: RuntimeSnapshotTransport,
     sessionId: string,
     startedAt: number,
   ) {
     this.registry = registry;
     this.history = history;
-    this.storage = storage;
+    this.transport = transport;
     this.sessionId = sessionId;
     this.startedAt = startedAt;
   }
@@ -32,7 +32,7 @@ export class SnapshotScheduler {
     }
 
     this.timer = setInterval(() => {
-      void this.persistSnapshot();
+      void this.emitSnapshot();
     }, 1000);
   }
 
@@ -45,7 +45,7 @@ export class SnapshotScheduler {
     this.timer = undefined;
   }
 
-  private async persistSnapshot(): Promise<void> {
+  private async emitSnapshot(): Promise<void> {
     const snapshot = createRuntimeSnapshot({
       registry: this.registry,
       history: this.history,
@@ -53,6 +53,6 @@ export class SnapshotScheduler {
       startedAt: this.startedAt,
     });
 
-    await this.storage.writeSnapshot(snapshot);
+    await this.transport.send(snapshot);
   }
 }

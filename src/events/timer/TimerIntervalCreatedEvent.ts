@@ -1,4 +1,5 @@
 import { ResourceIdentity, SourceLocation } from '../../core';
+import { ResourceOwner } from '../../core/Resource';
 import { RuntimeEvent } from '../RuntimeEvents';
 
 export interface TimerIntervalCreatedEvent extends RuntimeEvent {
@@ -11,4 +12,6 @@ export interface TimerIntervalCreatedEvent extends RuntimeEvent {
   readonly delay: number;
 
   readonly sourceLocation: SourceLocation;
+
+  owner: ResourceOwner;
 }

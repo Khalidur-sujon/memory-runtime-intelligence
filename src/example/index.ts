@@ -15,15 +15,14 @@ import { RuntimeStorage } from '../runtime/RuntimeStorage';
 import { SnapshotScheduler } from '../runtime/SnapshotScheduler';
 import { RuntimeStaleDetector } from '../runtime/RuntimeStaleDetector';
 import { RuntimeStateChecker } from '../runtime/RuntimeStateChecker';
+import { startRuntime } from '../bootstrap/startRuntime';
 
-const runtime = new RuntimeContext();
-
-await runtime.start();
+const runtime = await startRuntime();
 
 // runWebSocketLeakScenario(runtime);
 // runEventListenerLeakScenario(runtime);
 // runTimerLeakScenario(runtime);
-runObserverLeakScenario(runtime);
+// runObserverLeakScenario(runtime);
 
 await new Promise((resolve) => setTimeout(resolve, 1500));
 

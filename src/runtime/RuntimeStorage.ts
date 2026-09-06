@@ -1,13 +1,17 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+
 import path from 'node:path';
-import { RuntimeSnapshot } from './RuntimeSnapshot';
+
+import type { PersistedRuntimeSnapshot } from './RuntimeSnapshot';
 
 export class RuntimeStorage {
   private readonly directoryPath: string;
+
   private readonly snapshotPath: string;
 
   constructor(projectRoot: string = process.cwd()) {
     this.directoryPath = path.join(projectRoot, '.memory-runtime');
+
     this.snapshotPath = path.join(this.directoryPath, 'active.json');
   }
 
@@ -17,7 +21,7 @@ export class RuntimeStorage {
     });
   }
 
-  async writeSnapshot(snapshot: unknown): Promise<void> {
+  async writeSnapshot(snapshot: PersistedRuntimeSnapshot): Promise<void> {
     await this.ensureDirectory();
 
     await writeFile(
@@ -27,7 +31,7 @@ export class RuntimeStorage {
     );
   }
 
-  async readSnapshot(): Promise<RuntimeSnapshot | null> {
+  async readSnapshot(): Promise<PersistedRuntimeSnapshot | null> {
     try {
       const content = await readFile(this.snapshotPath, 'utf8');
 
@@ -35,7 +39,7 @@ export class RuntimeStorage {
         return null;
       }
 
-      return JSON.parse(content) as RuntimeSnapshot;
+      return JSON.parse(content) as PersistedRuntimeSnapshot;
     } catch (error: unknown) {
       if (
         typeof error === 'object' &&

@@ -17,11 +17,17 @@ export type ResourceType =
 export type ResourceState = 'observed' | 'released' | 'archived';
 
 /**
+ * Represents the state of a Resource Owner.
+ */
+export type ResourceOwner = 'application' | 'framework' | 'runtime';
+
+/**
  * Represents a runtime resource tracked by the system.
  */
 export interface Resource {
   readonly id: ResourceIdentity;
-  readonly resourceGroupId?: ResourceIdentity | null;
+  readonly resourceGroupId: ResourceIdentity | null;
   readonly type: ResourceType;
   state: ResourceState;
+  readonly owner: ResourceOwner;
 }

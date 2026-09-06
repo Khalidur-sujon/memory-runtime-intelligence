@@ -1,4 +1,5 @@
 import type { ResourceIdentity, SourceLocation } from '../../core';
+import { ResourceOwner } from '../../core/Resource';
 import { RuntimeEvent } from '../RuntimeEvents';
 
 export interface EventListenerAddedEvent extends RuntimeEvent {
@@ -13,4 +14,6 @@ export interface EventListenerAddedEvent extends RuntimeEvent {
   readonly eventType: string;
 
   readonly sourceLocation: SourceLocation;
+
+  owner: ResourceOwner;
 }

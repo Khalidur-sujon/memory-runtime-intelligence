@@ -14,7 +14,6 @@ export function createRuntimeSnapshot(
 ): RuntimeSnapshot {
   return {
     sessionId: options.sessionId,
-    pid: process.pid,
     startedAt: options.startedAt,
     updatedAt: Date.now(),
     resources: options.registry.list(),

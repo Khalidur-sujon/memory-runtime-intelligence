@@ -1,11 +1,15 @@
 import type { ResourceIdentity } from '../core';
+
 import type {
   EventPublisher,
   WebSocketClosedEvent,
   WebSocketCreatedEvent,
 } from '../events';
+
 import { createResourceGroupKey } from '../utils/ResourceGroupKey';
-import { captureSourceLocation } from '../utils/SourceLocationCapture';
+import { captureSourceContext } from '../utils/SourceLocationCapture';
+
+import { InstrumentationScope } from './InstrumentationScope';
 import type { Instrumentation } from './Instrumentation';
 
 interface WebSocketResource {
@@ -15,10 +19,11 @@ interface WebSocketResource {
 
 export class WebSocketInstrumentation implements Instrumentation {
   private readonly originalWebSocket = globalThis.WebSocket;
+
   private started = false;
 
   /**
-   * Tracks each actual runtime WebSocket instance.
+   * Tracks each actual WebSocket instance.
    *
    * WebSocket instance -> resource identity
    */
@@ -32,12 +37,15 @@ export class WebSocketInstrumentation implements Instrumentation {
    *
    * groupKey -> resourceGroupId
    *
-   * The same source location gets the same resourceGroupId
-   * during the current runtime session.
+   * The same source location gets the same
+   * resourceGroupId during the current runtime session.
    */
   private readonly resourceGroups = new Map<string, ResourceIdentity>();
 
-  constructor(private readonly publisher: EventPublisher) {}
+  constructor(
+    private readonly publisher: EventPublisher,
+    private readonly scope: InstrumentationScope,
+  ) {}
 
   start(): void {
     if (this.started) {
@@ -47,27 +55,62 @@ export class WebSocketInstrumentation implements Instrumentation {
     this.started = true;
 
     const OriginalWebSocket = this.originalWebSocket;
+
     const publisher = this.publisher;
+    const scope = this.scope;
     const sockets = this.sockets;
     const resourceGroups = this.resourceGroups;
 
+    /**
+     * --------------------------------------------------
+     * Patched WebSocket
+     * --------------------------------------------------
+     */
     class PatchedWebSocket extends OriginalWebSocket {
       constructor(...args: ConstructorParameters<typeof OriginalWebSocket>) {
+        /**
+         * Runtime internal WebSocket.
+         *
+         * This is important for:
+         *
+         * runtime
+         *   ↓
+         * runtimeWebSocketTransport
+         *   ↓
+         * new WebSocket(...)
+         *
+         * We do not want this connection to become
+         * an application resource.
+         */
+        if (scope.isInternal()) {
+          super(...args);
+          return;
+        }
+
+        /**
+         * Create the real WebSocket first.
+         */
         super(...args);
 
         /**
-         * Every actual WebSocket instance gets
-         * a unique resourceId.
+         * Every actual application WebSocket instance
+         * gets a unique resourceId.
          */
         const resourceId = crypto.randomUUID() as ResourceIdentity;
 
         /**
-         * Capture the creation location once.
+         * Capture complete stack and determine ownership.
          *
-         * This location is also used to determine
-         * the logical resource group.
+         * IMPORTANT:
+         * Ownership is no longer derived from the
+         * final sourceLocation.
          */
-        const sourceLocation = captureSourceLocation();
+        const { sourceLocation, owner } = captureSourceContext();
+
+        console.log('[WEBSOCKET SOURCE CONTEXT]', {
+          sourceLocation,
+          owner,
+        });
 
         /**
          * Same resource type + same source location
@@ -78,40 +121,52 @@ export class WebSocketInstrumentation implements Instrumentation {
         let resourceGroupId = resourceGroups.get(groupKey);
 
         /**
-         * First WebSocket created from this location:
-         * create a new logical group.
+         * First WebSocket from this source:
+         * create group.
          *
-         * Later WebSockets from the same location:
-         * reuse the existing group id.
+         * Later WebSockets from the same source:
+         * reuse the group.
          */
-
         if (!resourceGroupId) {
           resourceGroupId = crypto.randomUUID() as ResourceIdentity;
 
           resourceGroups.set(groupKey, resourceGroupId);
         }
 
+        /**
+         * Track the actual WebSocket instance.
+         */
         sockets.set(this, {
           resourceId,
           resourceGroupId,
         });
 
+        /**
+         * Publish creation event.
+         */
         const createdEvent: WebSocketCreatedEvent = {
           id: crypto.randomUUID(),
           type: 'WebSocketCreated',
           timestamp: Date.now(),
           resourceId,
           resourceGroupId,
-          url: args[0].toString(),
-
-          sourceLocation: captureSourceLocation(),
+          url: String(args[0]),
+          sourceLocation,
+          owner,
         };
 
         publisher.publish(createdEvent);
 
+        /**
+         * --------------------------------------------------
+         * Patch close()
+         * --------------------------------------------------
+         *
+         * Detect explicit WebSocket.close().
+         */
         const originalClose = this.close;
 
-        this.close = function (...closeArgs) {
+        this.close = function (...closeArgs): void {
           const resource = sockets.get(this);
 
           if (resource) {
@@ -128,11 +183,18 @@ export class WebSocketInstrumentation implements Instrumentation {
             sockets.delete(this);
           }
 
+          /**
+           * Preserve native close behavior.
+           */
           return originalClose.apply(this, closeArgs);
         };
       }
     }
 
+    /**
+     * Replace global WebSocket with
+     * our instrumented implementation.
+     */
     globalThis.WebSocket = PatchedWebSocket;
   }
 
@@ -143,15 +205,20 @@ export class WebSocketInstrumentation implements Instrumentation {
 
     this.started = false;
 
+    /**
+     * Restore the original browser WebSocket.
+     */
     globalThis.WebSocket = this.originalWebSocket;
 
     /**
-     * WebSocket instances belong to this runtime session.
+     * WebSocket instances belong to this
+     * runtime session.
      */
     this.sockets.clear();
 
     /**
-     * Logical groups also belong to this runtime session.
+     * Logical groups also belong to this
+     * runtime session.
      */
     this.resourceGroups.clear();
   }

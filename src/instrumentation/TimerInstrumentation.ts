@@ -1,10 +1,13 @@
 import type { ResourceIdentity } from '../core';
+
 import type { EventPublisher } from '../events';
+
 import { TimerIntervalCreatedEvent } from '../events/timer/TimerIntervalCreatedEvent';
 import { TimerIntervalReleasedEvent } from '../events/timer/TimerIntervalReleasedEvent';
-import { createResourceGroupKey } from '../utils/ResourceGroupKey';
 
-import { captureSourceLocation } from '../utils/SourceLocationCapture';
+import { createResourceGroupKey } from '../utils/ResourceGroupKey';
+import { captureSourceContext } from '../utils/SourceLocationCapture';
+
 import type { Instrumentation } from './Instrumentation';
 import { InstrumentationScope } from './InstrumentationScope';
 
@@ -36,8 +39,8 @@ export class TimerInstrumentation implements Instrumentation {
    *
    * groupKey -> resourceGroupId
    *
-   * The same source location gets the same resourceGroupId
-   * during the current runtime session.
+   * The same source location gets the same
+   * resourceGroupId during the current runtime session.
    */
   private readonly resourceGroups = new Map<string, ResourceIdentity>();
 
@@ -54,6 +57,7 @@ export class TimerInstrumentation implements Instrumentation {
     this.started = true;
 
     const originalSetInterval = this.originalSetInterval;
+
     const originalClearInterval = this.originalClearInterval;
 
     const publisher = this.publisher;
@@ -61,25 +65,47 @@ export class TimerInstrumentation implements Instrumentation {
     const intervals = this.intervals;
     const resourceGroups = this.resourceGroups;
 
+    /**
+     * --------------------------------------------------
+     * setInterval
+     * --------------------------------------------------
+     */
     globalThis.setInterval = ((...args: SetIntervalArgs) => {
+      /**
+       * Always create the real interval first.
+       *
+       * This preserves the native browser/runtime behavior.
+       */
       const intervalId = originalSetInterval(...args);
 
+      /**
+       * Runtime internal interval.
+       *
+       * Do not track our own scheduler/internal timers.
+       */
       if (scope.isInternal()) {
         return intervalId;
       }
 
       /**
-       * Every actual interval instance gets a unique resourceId.
+       * Every actual application interval gets
+       * a unique resourceId.
        */
       const resourceId = crypto.randomUUID() as ResourceIdentity;
 
       /**
-       * Capture the creation location once.
+       * Capture the complete stack and determine
+       * ownership from the stack.
        *
-       * This location is also used to determine the logical
-       * resource group.
+       * IMPORTANT:
+       * Do not use:
+       *
+       * captureSourceLocation()
+       * determineResourceOwner()
+       *
+       * separately.
        */
-      const sourceLocation = captureSourceLocation();
+      const { sourceLocation, owner } = captureSourceContext();
 
       /**
        * Same resource type + same source location
@@ -102,11 +128,17 @@ export class TimerInstrumentation implements Instrumentation {
         resourceGroups.set(groupKey, resourceGroupId);
       }
 
+      /**
+       * Track the actual interval instance.
+       */
       intervals.set(intervalId, {
         resourceId,
         resourceGroupId,
       });
 
+      /**
+       * Publish creation event.
+       */
       const createdEvent: TimerIntervalCreatedEvent = {
         id: crypto.randomUUID(),
         type: 'TimerIntervalCreated',
@@ -115,6 +147,7 @@ export class TimerInstrumentation implements Instrumentation {
         resourceGroupId,
         delay: extractDelay(args),
         sourceLocation,
+        owner,
       };
 
       publisher.publish(createdEvent);
@@ -122,9 +155,18 @@ export class TimerInstrumentation implements Instrumentation {
       return intervalId;
     }) as typeof globalThis.setInterval;
 
+    /**
+     * --------------------------------------------------
+     * clearInterval
+     * --------------------------------------------------
+     */
     globalThis.clearInterval = ((intervalId: IntervalHandle) => {
       const resource = intervals.get(intervalId);
 
+      /**
+       * If this interval belongs to an
+       * application resource, publish release.
+       */
       if (resource) {
         const releasedEvent: TimerIntervalReleasedEvent = {
           id: crypto.randomUUID(),
@@ -132,7 +174,7 @@ export class TimerInstrumentation implements Instrumentation {
           timestamp: Date.now(),
           resourceId: resource.resourceId,
           resourceGroupId: resource.resourceGroupId,
-          sourceLocation: captureSourceLocation(),
+          sourceLocation: captureSourceContext().sourceLocation,
         };
 
         publisher.publish(releasedEvent);
@@ -140,6 +182,9 @@ export class TimerInstrumentation implements Instrumentation {
         intervals.delete(intervalId);
       }
 
+      /**
+       * Always preserve native behavior.
+       */
       originalClearInterval(
         intervalId as Parameters<typeof globalThis.clearInterval>[0],
       );
@@ -153,23 +198,39 @@ export class TimerInstrumentation implements Instrumentation {
 
     this.started = false;
 
+    /**
+     * Restore native timer APIs.
+     */
     globalThis.setInterval = this.originalSetInterval;
 
     globalThis.clearInterval = this.originalClearInterval;
 
     /**
-     * Interval instances belong to this runtime session.
+     * Interval instances belong to this
+     * runtime session.
      */
     this.intervals.clear();
 
     /**
-     * Logical groups also belong to this runtime session.
-     * They should not leak into the next runtime session.
+     * Logical groups also belong to this
+     * runtime session.
      */
     this.resourceGroups.clear();
   }
 }
 
+/**
+ * Extracts the interval delay.
+ *
+ * setInterval accepts:
+ *
+ *   setInterval(callback, delay)
+ *
+ * and the delay can be omitted or non-numeric.
+ *
+ * Invalid / non-finite / negative values
+ * are normalized to 0.
+ */
 function extractDelay(args: SetIntervalArgs): number {
   const delay = args[1];
 

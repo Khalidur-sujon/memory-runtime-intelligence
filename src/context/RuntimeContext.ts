@@ -9,13 +9,15 @@ import { EventListenerInstrumentation } from '../instrumentation/EventListenerIn
 import { TimerInstrumentation } from '../instrumentation/TimerInstrumentation';
 import { ObserverInstrumentation } from '../instrumentation/ObserverInstrumentation';
 import { RuntimeSession } from '../runtime/RuntimeSession';
-import { RuntimeStorage } from '../runtime/RuntimeStorage';
 import { SnapshotScheduler } from '../runtime/SnapshotScheduler';
-import { RuntimeStaleDetector } from '../runtime/RuntimeStaleDetector';
-import { RuntimeStateChecker } from '../runtime/RuntimeStateChecker';
 import { InstrumentationScope } from '../instrumentation/InstrumentationScope';
+import { RuntimeWebSocketTransport } from '../runtime/RuntimeWebSocketTransport';
 
 export class RuntimeContext {
+  private started = false;
+
+  private starting = false;
+
   private readonly registry: Registry;
 
   private readonly history: History;
@@ -23,92 +25,116 @@ export class RuntimeContext {
   private readonly eventBus: InMemoryEventBus;
 
   private readonly websocketInstrumentation: WebSocketInstrumentation;
+
   private readonly eventListenerInstrumentation: EventListenerInstrumentation;
+
   private readonly timerInstrumentation: TimerInstrumentation;
+
   private readonly ObserverInstrumentation: ObserverInstrumentation;
 
+  private readonly runtimeWebSocketTransport: RuntimeWebSocketTransport;
+
   private readonly session: RuntimeSession;
-  private readonly storage: RuntimeStorage;
+
   private readonly snapshotScheduler: SnapshotScheduler;
+
   private readonly instrumentationScope: InstrumentationScope;
 
   constructor() {
     this.registry = new InMemoryRegistry();
-
     this.history = new InMemoryHistory();
-
     this.eventBus = new InMemoryEventBus();
 
     this.instrumentationScope = new InstrumentationScope();
 
     const registrySubscriber = new RegistrySubscriber(this.registry);
-
     const historySubscriber = new HistorySubscriber(this.history);
 
     this.eventBus.subscribe(registrySubscriber);
     this.eventBus.subscribe(historySubscriber);
 
-    this.websocketInstrumentation = new WebSocketInstrumentation(this.eventBus);
+    this.runtimeWebSocketTransport = new RuntimeWebSocketTransport(
+      this.instrumentationScope,
+    );
+
+    this.websocketInstrumentation = new WebSocketInstrumentation(
+      this.eventBus,
+      this.instrumentationScope,
+    );
+
     this.eventListenerInstrumentation = new EventListenerInstrumentation(
       this.eventBus,
+      this.instrumentationScope,
     );
 
     this.timerInstrumentation = new TimerInstrumentation(
       this.eventBus,
       this.instrumentationScope,
     );
+
     this.ObserverInstrumentation = new ObserverInstrumentation(this.eventBus);
 
     this.session = new RuntimeSession();
 
-    this.storage = new RuntimeStorage();
-
     this.snapshotScheduler = new SnapshotScheduler(
       this.registry,
       this.history,
-      this.storage,
+      this.runtimeWebSocketTransport,
       this.session.getSessionId(),
       this.session.getStartedAt(),
     );
   }
 
   async start(): Promise<void> {
-    const staleDetector = new RuntimeStaleDetector();
-
-    const stateChecker = new RuntimeStateChecker(this.storage, staleDetector);
-
-    const stale = await stateChecker.isStale();
-
-    if (stale) {
-      await this.storage.removeDirectory();
+    if (this.started || this.starting) {
+      return;
     }
 
-    this.session.start();
-
-    this.websocketInstrumentation.start();
-    this.eventListenerInstrumentation.start();
-    this.timerInstrumentation.start();
-    this.ObserverInstrumentation.start();
-
-    this.instrumentationScope.enterInternal();
+    this.starting = true;
 
     try {
-      this.snapshotScheduler.start();
+      this.session.start();
+
+      this.websocketInstrumentation.start();
+
+      this.eventListenerInstrumentation.start();
+
+      this.timerInstrumentation.start();
+
+      this.ObserverInstrumentation.start();
+
+      this.instrumentationScope.enterInternal();
+
+      try {
+        this.snapshotScheduler.start();
+      } finally {
+        this.instrumentationScope.exitInternal();
+      }
+
+      this.started = true;
     } finally {
-      this.instrumentationScope.exitInternal();
+      this.starting = false;
     }
   }
 
   async stop(): Promise<void> {
+    if (!this.started) {
+      return;
+    }
+
     this.snapshotScheduler.stop();
 
     this.websocketInstrumentation.stop();
+
     this.eventListenerInstrumentation.stop();
+
     this.timerInstrumentation.stop();
 
-    await this.storage.removeDirectory();
+    this.ObserverInstrumentation.stop();
 
     this.session.shutdown();
+
+    this.started = false;
   }
 
   getSessionId(): string {
@@ -132,9 +158,8 @@ export class RuntimeContext {
 
   async reset(): Promise<void> {
     this.registry.clear();
-    this.history.clear();
 
-    await this.storage.clearSnapshot();
+    this.history.clear();
 
     this.session.reset();
   }
