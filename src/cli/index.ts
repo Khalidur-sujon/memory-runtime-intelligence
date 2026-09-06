@@ -119,7 +119,7 @@ async function start(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const command = process.argv[2];
+  const command = process.argv[2] ?? 'report';
 
   switch (command) {
     case 'start':
@@ -131,13 +131,13 @@ async function main(): Promise<void> {
       return;
 
     default:
-      console.log(`
-Memory Runtime Intelligence
+      //       console.log(`
+      // Memory Runtime Intelligence
 
-Usage:
-  memory-runtime-intelligence start
-  memory-runtime-intelligence report
-`);
+      // Usage:
+      //   memory-runtime-intelligence start
+      //   memory-runtime-intelligence report
+      // `);
 
       return;
   }

@@ -33,6 +33,10 @@ export class RuntimeCollector {
       port: this.port,
     });
 
+    server.on('connection', (socket) => {
+      this.handleConnection(socket);
+    });
+
     this.server = server;
   }
 

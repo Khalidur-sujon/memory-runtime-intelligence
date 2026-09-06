@@ -15,6 +15,12 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs",
       "default": "./dist/index.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js",
+      "require": "./dist/vite.cjs",
+      "default": "./dist/vite.js"
     }
   },
   "files": [
@@ -57,10 +63,14 @@
     "prettier": "^3.9.6",
     "tsup": "^8.5.1",
     "tsx": "^4.23.5",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2"
   },
   "dependencies": {
     "jsdom": "^29.1.1",
     "ws": "^8.21.3"
+  },
+  "peerDependencies": {
+    "vite": "^8.2.2"
   }
 }

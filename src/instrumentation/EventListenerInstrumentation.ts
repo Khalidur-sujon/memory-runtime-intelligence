@@ -141,6 +141,11 @@ export class EventListenerInstrumentation implements Instrumentation {
          */
         const { sourceLocation, owner } = captureSourceContext();
 
+        console.log('[MRI EVENT LISTENER SOURCE]', {
+          sourceLocation,
+          owner,
+        });
+
         /**
          * Same resource type + same source location
          * = same logical resource group.

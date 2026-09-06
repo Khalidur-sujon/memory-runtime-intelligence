@@ -5,6 +5,8 @@ export default defineConfig({
     index: 'src/index.ts',
     cli: 'src/cli/index.ts',
     collector: 'src/collector/index.ts',
+    vite: 'src/integrations/vite/index.ts',
+    'runtime-client': 'src/runtime/client.ts',
   },
 
   format: ['esm', 'cjs'],
@@ -22,4 +24,6 @@ export default defineConfig({
   treeshake: true,
 
   outDir: 'dist',
+
+  external: ['vite'],
 });
