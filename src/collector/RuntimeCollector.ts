@@ -37,6 +37,43 @@ export class RuntimeCollector {
       this.handleConnection(socket);
     });
 
+    server.on('listening', () => {
+      this.started = true;
+      this.server = server;
+    });
+
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.warn(`[MRI] Unable to start WebSocket server on :${this.port}`);
+
+        console.warn(`[MRI] Port ${this.port} is already in use.`);
+
+        console.warn('[MRI] Another MRI/Vite process may still be suspended.');
+
+        console.warn(
+          '[MRI] If you suspended the previous dev server with Ctrl+Z,',
+        );
+
+        console.warn('      resume/terminate that job first.');
+
+        console.warn('[MRI] To find the process using this port:');
+
+        console.warn(`      lsof -nP -iTCP:${this.port} -sTCP:LISTEN`);
+
+        console.warn('[MRI] Then terminate the process:');
+
+        console.warn('      kill <PID>');
+
+        console.warn('[MRI] If the process does not terminate, force kill it:');
+
+        console.warn('      kill -9 <PID>');
+
+        return;
+      }
+
+      console.error('[MRI] WebSocket server error:', error);
+    });
+
     this.server = server;
   }
 
