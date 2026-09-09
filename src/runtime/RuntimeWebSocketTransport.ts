@@ -37,7 +37,7 @@ export class RuntimeWebSocketTransport implements RuntimeSnapshotTransport {
       return this.socket;
     }
 
-    console.log('[runtime] Connecting to collector:', this.url);
+    // console.log('[runtime] Connecting to collector:', this.url);
 
     const socket = new WebSocket(this.url);
 

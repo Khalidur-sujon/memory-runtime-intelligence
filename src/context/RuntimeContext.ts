@@ -72,7 +72,10 @@ export class RuntimeContext {
       this.instrumentationScope,
     );
 
-    this.ObserverInstrumentation = new ObserverInstrumentation(this.eventBus);
+    this.ObserverInstrumentation = new ObserverInstrumentation(
+      this.eventBus,
+      this.instrumentationScope,
+    );
 
     this.session = new RuntimeSession();
 

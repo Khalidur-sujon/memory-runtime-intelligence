@@ -107,11 +107,6 @@ export class WebSocketInstrumentation implements Instrumentation {
          */
         const { sourceLocation, owner } = captureSourceContext();
 
-        console.log('[WEBSOCKET SOURCE CONTEXT]', {
-          sourceLocation,
-          owner,
-        });
-
         /**
          * Same resource type + same source location
          * = same logical resource group.

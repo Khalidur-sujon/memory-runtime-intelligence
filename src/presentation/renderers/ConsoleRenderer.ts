@@ -36,7 +36,6 @@ export class ConsoleRenderer implements Renderer {
     // ==================================================
 
     lines.push('');
-    lines.push('memory-runtime-intelligence');
     lines.push('');
     lines.push('⚠ Potential Memory Retention');
     lines.push('');

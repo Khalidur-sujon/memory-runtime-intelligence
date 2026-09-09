@@ -19,7 +19,8 @@ export type ResourceState = 'observed' | 'released' | 'archived';
 /**
  * Represents the state of a Resource Owner.
  */
-export type ResourceOwner = 'application' | 'framework' | 'runtime';
+export type ResourceOwner =
+  'application' | 'framework' | 'runtime' | 'infrastructure';
 
 /**
  * Represents a runtime resource tracked by the system.

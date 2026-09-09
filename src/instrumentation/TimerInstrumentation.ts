@@ -160,6 +160,7 @@ export class TimerInstrumentation implements Instrumentation {
      * clearInterval
      * --------------------------------------------------
      */
+
     globalThis.clearInterval = ((intervalId: IntervalHandle) => {
       const resource = intervals.get(intervalId);
 

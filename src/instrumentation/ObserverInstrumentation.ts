@@ -6,9 +6,10 @@ import { ObserverReleasedEvent } from '../events/observer/ObserverReleasedEvent'
 import { ObserverStartedEvent } from '../events/observer/ObserverStartedEvent';
 
 import { createResourceGroupKey } from '../utils/ResourceGroupKey';
-import { captureSourceLocation } from '../utils/SourceLocationCapture';
+import { captureSourceContext } from '../utils/SourceLocationCapture';
 
 import type { Instrumentation } from './Instrumentation';
+import { InstrumentationScope } from './InstrumentationScope';
 
 type ObserverType = 'mutation' | 'resize' | 'intersection';
 
@@ -19,7 +20,9 @@ interface ObserverResource {
 
 export class ObserverInstrumentation implements Instrumentation {
   private readonly originalMutationObserver = globalThis.MutationObserver;
+
   private readonly originalResizeObserver = globalThis.ResizeObserver;
+
   private readonly originalIntersectionObserver =
     globalThis.IntersectionObserver;
 
@@ -43,7 +46,10 @@ export class ObserverInstrumentation implements Instrumentation {
    */
   private readonly resourceGroups = new Map<string, ResourceIdentity>();
 
-  constructor(private readonly publisher: EventPublisher) {}
+  constructor(
+    private readonly publisher: EventPublisher,
+    private readonly scope: InstrumentationScope,
+  ) {}
 
   start(): void {
     if (this.started) {
@@ -53,14 +59,13 @@ export class ObserverInstrumentation implements Instrumentation {
     this.started = true;
 
     const OriginalMutationObserver = this.originalMutationObserver;
-
     const OriginalResizeObserver = this.originalResizeObserver;
-
     const OriginalIntersectionObserver = this.originalIntersectionObserver;
 
     const publisher = this.publisher;
     const observers = this.observers;
     const resourceGroups = this.resourceGroups;
+    const scope = this.scope;
 
     /**
      * Creates the resource identity and resource group
@@ -71,19 +76,41 @@ export class ObserverInstrumentation implements Instrumentation {
       observerType: ObserverType,
     ): void => {
       /**
+       * Observer creation performed internally by MRI
+       * must never become a tracked application resource.
+       */
+      if (scope.isInternal()) {
+        return;
+      }
+
+      /**
        * Every actual Observer instance gets
        * a unique resourceId.
        */
       const resourceId = crypto.randomUUID() as ResourceIdentity;
 
       /**
-       * Capture the creation location once.
+       * Capture the COMPLETE source context.
        *
-       * This location is used to determine the
-       * logical resource group and is also published
-       * with the Created event.
+       * This gives us:
+       *
+       *   sourceLocation
+       *   owner
+       *
+       * from the complete JavaScript stack.
        */
-      const sourceLocation = captureSourceLocation();
+      const { sourceLocation, owner } = captureSourceContext();
+
+      /**
+       * If the stack does not contain a useful application
+       * or framework source, do not create a developer resource.
+       *
+       * Runtime-only / infrastructure-only observer creation
+       * should not pollute the report.
+       */
+      // if (owner === 'runtime') {
+      //   return;
+      // }
 
       /**
        * Same observer type + same source location
@@ -96,16 +123,8 @@ export class ObserverInstrumentation implements Instrumentation {
 
       let resourceGroupId = resourceGroups.get(groupKey);
 
-      /**
-       * First Observer created from this location:
-       * create a new logical group.
-       *
-       * Later Observers from the same location:
-       * reuse the existing group id.
-       */
       if (!resourceGroupId) {
         resourceGroupId = crypto.randomUUID() as ResourceIdentity;
-
         resourceGroups.set(groupKey, resourceGroupId);
       }
 
@@ -120,6 +139,7 @@ export class ObserverInstrumentation implements Instrumentation {
         timestamp: Date.now(),
         resourceId,
         resourceGroupId,
+        owner,
         observerType,
         sourceLocation,
       };
@@ -129,9 +149,6 @@ export class ObserverInstrumentation implements Instrumentation {
 
     /**
      * MutationObserver
-     *
-     * Only patch when MutationObserver actually
-     * exists in the current runtime.
      */
     if (OriginalMutationObserver) {
       class PatchedMutationObserver extends OriginalMutationObserver {
@@ -190,9 +207,6 @@ export class ObserverInstrumentation implements Instrumentation {
 
     /**
      * ResizeObserver
-     *
-     * Only patch when ResizeObserver actually
-     * exists in the current runtime.
      */
     if (OriginalResizeObserver) {
       class PatchedResizeObserver extends OriginalResizeObserver {
@@ -251,9 +265,6 @@ export class ObserverInstrumentation implements Instrumentation {
 
     /**
      * IntersectionObserver
-     *
-     * Only patch when IntersectionObserver actually
-     * exists in the current runtime.
      */
     if (OriginalIntersectionObserver) {
       class PatchedIntersectionObserver extends OriginalIntersectionObserver {

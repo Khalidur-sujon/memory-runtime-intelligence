@@ -6,30 +6,20 @@ export interface SourceContext {
   owner: ResourceOwner;
 }
 
+type FrameType =
+  'runtime' | 'framework' | 'infrastructure' | 'application' | 'unknown';
+
 /**
  * Captures the complete source context from the current JavaScript stack.
  *
  * Stack traversal:
- *
  *   MRI runtime        -> ignored
  *   framework          -> remembered as framework
- *   infrastructure     -> ignored
- *   application        -> selected as source
+ *   infrastructure    -> ignored
+ *   application       -> selected as source
+ *   unknown            -> ignored
  *
- * Example:
- *
- *   runtime-client.js
- *        ↓
- *   TimerInstrumentation
- *        ↓
- *   React
- *        ↓
- *   App.tsx
- *
- * Result:
- *
- *   sourceLocation = App.tsx
- *   owner          = application
+ * The first qualified application frame becomes the source location.
  */
 export function captureSourceContext(): SourceContext {
   const stack = new Error().stack;
@@ -42,7 +32,6 @@ export function captureSourceContext(): SourceContext {
   }
 
   const stackLines = stack.split('\n');
-
   let frameworkDetected = false;
 
   for (const line of stackLines) {
@@ -52,9 +41,10 @@ export function captureSourceContext(): SourceContext {
       continue;
     }
 
-    const normalized = normalizePath(parsed.filePath);
+    const normalizedPath = normalizePath(parsed.filePath);
+
     const frameType = classifyFrame(
-      normalized,
+      normalizedPath,
       parsed.lineNumber,
       parsed.columnNumber,
     );
@@ -69,7 +59,7 @@ export function captureSourceContext(): SourceContext {
     /**
      * A framework may be responsible for creating the resource.
      *
-     * We remember that fact but continue walking the stack
+     * Remember that fact but continue walking the stack
      * to find the application source location.
      */
     if (frameType === 'framework') {
@@ -78,16 +68,22 @@ export function captureSourceContext(): SourceContext {
     }
 
     /**
-     * Bundlers, dev servers and dependencies are infrastructure.
-     *
-     * They must never become the developer source.
+     * Bundlers, dev servers, virtual modules, and dependencies
+     * must never become the developer source.
      */
     if (frameType === 'infrastructure') {
       continue;
     }
 
     /**
-     * First real application frame.
+     * Unknown frames are not trusted as application frames.
+     */
+    if (frameType === 'unknown') {
+      continue;
+    }
+
+    /**
+     * The first qualified application frame becomes the source.
      */
     if (frameType === 'application') {
       const sourceLocation: SourceLocation = {
@@ -130,10 +126,11 @@ export function captureSourceLocation(): SourceLocation {
   return captureSourceContext().sourceLocation;
 }
 
-type FrameType = 'runtime' | 'framework' | 'infrastructure' | 'application';
-
 /**
  * Determines the semantic type of a stack frame.
+ *
+ * Application is intentionally not the default fallback.
+ * A frame must explicitly qualify as application code.
  */
 function classifyFrame(
   normalizedPath: string,
@@ -148,15 +145,15 @@ function classifyFrame(
     return 'framework';
   }
 
-  if (isViteClientFrame(normalizedPath, lineNumber, columnNumber)) {
-    return 'infrastructure';
-  }
-
   if (isInfrastructureFrame(normalizedPath)) {
     return 'infrastructure';
   }
 
-  return 'application';
+  if (isApplicationFrame(normalizedPath, lineNumber, columnNumber)) {
+    return 'application';
+  }
+
+  return 'unknown';
 }
 
 /**
@@ -164,14 +161,14 @@ function classifyFrame(
  * Runtime / instrumentation detection
  * --------------------------------------------------
  */
+
 function isRuntimeFrame(normalizedPath: string): boolean {
   /**
    * Published/local MRI package.
    *
    * Examples:
-   *
-   * /node_modules/memory-runtime-intelligence/dist/...
-   * /memory-runtime-intelligence/src/...
+   *   /node_modules/memory-runtime-intelligence/dist/...
+   *   /memory-runtime-intelligence/src/...
    */
   if (normalizedPath.includes('/memory-runtime-intelligence/')) {
     return true;
@@ -197,11 +194,10 @@ function isRuntimeFrame(normalizedPath: string): boolean {
    * MRI browser runtime.
    *
    * Vite serves the runtime through:
+   *   /__memory_runtime_intelligence__/runtime-client.js
    *
-   * /__memory_runtime_intelligence__/runtime-client.js
-   *
-   * Depending on the browser and dev server, the stack may expose
-   * only "runtime-client.js", so both forms are covered.
+   * Some browsers may expose only:
+   *   runtime-client.js
    */
   if (
     normalizedPath.includes(
@@ -213,7 +209,7 @@ function isRuntimeFrame(normalizedPath: string): boolean {
   }
 
   /**
-   * Browser / Node internal frames.
+   * Browser and Node internal frames.
    */
   if (
     normalizedPath.startsWith('native ') ||
@@ -231,9 +227,10 @@ function isRuntimeFrame(normalizedPath: string): boolean {
  * Framework detection
  * --------------------------------------------------
  */
+
 function isFrameworkFrame(normalizedPath: string): boolean {
   /**
-   * React / React DOM
+   * React / React DOM.
    */
   if (
     normalizedPath.includes('/react-dom/') ||
@@ -250,7 +247,7 @@ function isFrameworkFrame(normalizedPath: string): boolean {
   }
 
   /**
-   * Vue
+   * Vue.
    */
   if (
     normalizedPath.includes('/vue/') ||
@@ -262,7 +259,7 @@ function isFrameworkFrame(normalizedPath: string): boolean {
   }
 
   /**
-   * Angular
+   * Angular.
    */
   if (
     normalizedPath.includes('/@angular/') ||
@@ -274,7 +271,7 @@ function isFrameworkFrame(normalizedPath: string): boolean {
   }
 
   /**
-   * Svelte
+   * Svelte.
    */
   if (
     normalizedPath.includes('/svelte/') ||
@@ -292,20 +289,21 @@ function isFrameworkFrame(normalizedPath: string): boolean {
  * Infrastructure detection
  * --------------------------------------------------
  */
+
 function isInfrastructureFrame(normalizedPath: string): boolean {
   /**
-   * --------------------------------------------------
-   * Vite browser client / HMR client
-   * --------------------------------------------------
+   * Known Vite browser client / HMR client paths.
    *
-   * Vite can expose stack frames like:
+   * Examples:
+   *   vite/client
+   *   vite/client:912:43
    *
-   *   client:912:43
-   *   client:872:27
-   *   client:415:11
-   *
-   * These are NOT application files.
+   * The parser removes the line and column numbers before
+   * this function receives the path.
    */
+  if (isVirtualClientPath(normalizedPath)) {
+    return true;
+  }
 
   /**
    * Vite internal paths.
@@ -324,7 +322,8 @@ function isInfrastructureFrame(normalizedPath: string): boolean {
    */
   if (
     normalizedPath.includes('/webpack/') ||
-    normalizedPath.includes('webpack-dev-server')
+    normalizedPath.includes('webpack-dev-server') ||
+    normalizedPath.includes('webpack/client')
   ) {
     return true;
   }
@@ -340,10 +339,20 @@ function isInfrastructureFrame(normalizedPath: string): boolean {
   }
 
   /**
-   * Any other node_modules dependency.
-   *
-   * Frameworks were already checked before this function,
-   * so React/Vue/Angular/etc. won't be swallowed here.
+   * Generic development server infrastructure.
+   */
+  if (
+    normalizedPath.includes('webpack-dev-server') ||
+    normalizedPath.includes('hot-update') ||
+    normalizedPath.includes('__webpack') ||
+    normalizedPath.includes('__vite')
+  ) {
+    return true;
+  }
+
+  /**
+   * Any node_modules dependency is infrastructure unless it was
+   * already identified as a framework above.
    */
   if (normalizedPath.includes('/node_modules/')) {
     return true;
@@ -353,24 +362,117 @@ function isInfrastructureFrame(normalizedPath: string): boolean {
 }
 
 /**
- * Detects Vite's browser client stack locations.
+ * Detects virtual client paths such as:
  *
- * Supported examples:
+ *   vite/client
+ *   webpack/client
+ *   vue/client
+ *   angular/client
+ *   astro/client
  *
- *   client:912:43
- *   client:872:27
- *   client:415:11
- *
- * We intentionally allow whitespace because some browsers can
- * produce slightly different stack formatting.
+ * This is intentionally based on the virtual-module shape rather
+ * than treating every file containing the word "client" as
+ * infrastructure.
  */
-function isViteClientFrame(
+function isVirtualClientPath(normalizedPath: string): boolean {
+  return /^[a-z0-9@_-]+\/client$/.test(normalizedPath);
+}
+
+/**
+ * --------------------------------------------------
+ * Application detection
+ * --------------------------------------------------
+ */
+
+/**
+ * Determines whether a frame qualifies as application code.
+ *
+ * A frame is considered application code only when:
+ *   1. It has a valid source-file extension.
+ *   2. It is not MRI runtime code.
+ *   3. It is not framework code.
+ *   4. It is not infrastructure.
+ *   5. It is not a dependency.
+ *   6. It has a valid stack location.
+ */
+function isApplicationFrame(
   normalizedPath: string,
   lineNumber: number,
   columnNumber: number,
 ): boolean {
-  return normalizedPath === 'client' && lineNumber > 0 && columnNumber > 0;
+  /**
+   * A valid source location requires positive line and column numbers.
+   */
+  if (lineNumber <= 0 || columnNumber <= 0) {
+    return false;
+  }
+
+  /**
+   * Virtual or extensionless paths are not trusted as application files.
+   */
+  if (!hasFileExtension(normalizedPath)) {
+    return false;
+  }
+
+  /**
+   * MRI runtime frames must never become application sources.
+   */
+  if (isRuntimeFrame(normalizedPath)) {
+    return false;
+  }
+
+  /**
+   * Framework internals must never become application sources.
+   */
+  if (isFrameworkFrame(normalizedPath)) {
+    return false;
+  }
+
+  /**
+   * Bundlers, dev servers, and dependencies must never become
+   * application sources.
+   */
+  if (isInfrastructureFrame(normalizedPath)) {
+    return false;
+  }
+
+  /**
+   * Dependencies must never become application sources.
+   */
+  if (normalizedPath.includes('/node_modules/')) {
+    return false;
+  }
+
+  /**
+   * Only recognized source-file extensions qualify.
+   */
+  if (!hasSourceExtension(normalizedPath)) {
+    return false;
+  }
+
+  return true;
 }
+
+/**
+ * Checks whether the path contains a file extension.
+ */
+function hasFileExtension(normalizedPath: string): boolean {
+  const cleanPath = removeQueryAndHash(normalizedPath);
+  const fileName = cleanPath.split('/').pop() ?? cleanPath;
+
+  return /\.[a-z0-9]+$/i.test(fileName);
+}
+
+/**
+ * Checks whether the file uses a supported application source extension.
+ */
+function hasSourceExtension(normalizedPath: string): boolean {
+  const cleanPath = removeQueryAndHash(normalizedPath);
+  const fileName = cleanPath.split('/').pop() ?? cleanPath;
+
+  return /\.(ts|tsx|js|jsx|mjs|cjs|vue|svelte|astro)$/.test(fileName);
+}
+
 /**
  * --------------------------------------------------
  * Stack parsing
@@ -381,16 +483,15 @@ function isViteClientFrame(
  * Parses common browser stack formats.
  *
  * Chrome / Edge / Node:
- *
  *   at functionName (http://localhost:5173/src/App.tsx:10:20)
+ *
+ * Chrome / Edge / Node:
  *   at http://localhost:5173/src/App.tsx:10:20
  *
  * Firefox / Safari:
- *
  *   functionName@http://localhost:5173/src/App.tsx:10:20
  *
  * Bare:
- *
  *   http://localhost:5173/src/App.tsx:10:20
  */
 function parseStackLine(line: string): {
@@ -403,7 +504,7 @@ function parseStackLine(line: string): {
   /**
    * Chrome / Edge / Node:
    *
-   * at functionName (http://localhost:5173/src/App.tsx:10:20)
+   *   at functionName (http://localhost:5173/src/App.tsx:10:20)
    */
   const withParentheses = trimmed.match(/\((.+):(\d+):(\d+)\)$/);
 
@@ -418,7 +519,7 @@ function parseStackLine(line: string): {
   /**
    * Chrome / Edge / Node:
    *
-   * at http://localhost:5173/src/App.tsx:10:20
+   *   at http://localhost:5173/src/App.tsx:10:20
    */
   const withAt = trimmed.match(/^at\s+(.+):(\d+):(\d+)$/);
 
@@ -433,7 +534,7 @@ function parseStackLine(line: string): {
   /**
    * Firefox / Safari:
    *
-   * functionName@http://localhost:5173/src/App.tsx:10:20
+   *   functionName@http://localhost:5173/src/App.tsx:10:20
    */
   const withFunctionName = trimmed.match(/^.*@(.+):(\d+):(\d+)$/);
 
@@ -448,7 +549,7 @@ function parseStackLine(line: string): {
   /**
    * Bare location:
    *
-   * http://localhost:5173/src/App.tsx:10:20
+   *   http://localhost:5173/src/App.tsx:10:20
    */
   const bareLocation = trimmed.match(/^(.+):(\d+):(\d+)$/);
 
@@ -486,7 +587,7 @@ function getFileName(filePath: string): string {
 }
 
 /**
- * Removes Vite query strings and hash fragments.
+ * Removes query strings and hash fragments.
  */
 function removeQueryAndHash(filePath: string): string {
   return filePath.split('?')[0].split('#')[0];
