@@ -32,8 +32,6 @@ const memoryRuntimeIntelligence = () => {
       collector = new RuntimeCollector();
       collector.start();
 
-      console.log('[MRI] Collector started');
-
       server.middlewares.use(RUNTIME_CLIENT_URL, async (_req, res, next) => {
         try {
           const runtimeClientPath = new URL(

@@ -14,6 +14,8 @@ export class RuntimeCollector {
 
   private server: WebSocketServer | undefined;
 
+  private readonly sockets = new Set<WebSocket>();
+
   private started = false;
 
   constructor(port = 8787, projectRoot = process.cwd()) {
@@ -40,6 +42,8 @@ export class RuntimeCollector {
     server.on('listening', () => {
       this.started = true;
       this.server = server;
+
+      console.log(`[MRI] Runtime collector listening on :${this.port}`);
     });
 
     server.on('error', (error: NodeJS.ErrnoException) => {
@@ -88,6 +92,15 @@ export class RuntimeCollector {
 
     this.server = undefined;
 
+    // Close all active browser WebSocket connections first.
+    for (const socket of this.sockets) {
+      try {
+        socket.close();
+      } catch {
+        // Ignore socket shutdown errors.
+      }
+    }
+
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
         if (error) {
@@ -101,8 +114,17 @@ export class RuntimeCollector {
   }
 
   private handleConnection(socket: WebSocket): void {
+    this.sockets.add(socket);
+
     socket.on('message', (data) => {
       void this.handleSnapshot(data);
+    });
+    socket.on('close', () => {
+      this.sockets.delete(socket);
+    });
+
+    socket.on('error', () => {
+      this.sockets.delete(socket);
     });
   }
 
