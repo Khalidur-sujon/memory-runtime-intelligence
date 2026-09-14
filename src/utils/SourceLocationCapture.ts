@@ -43,6 +43,8 @@ export function captureSourceContext(): SourceContext {
 
     const normalizedPath = normalizePath(parsed.filePath);
 
+    console.log('[MRI STACK FRAME]', parsed.filePath);
+
     const frameType = classifyFrame(
       normalizedPath,
       parsed.lineNumber,
@@ -302,6 +304,19 @@ function isInfrastructureFrame(normalizedPath: string): boolean {
    * this function receives the path.
    */
   if (isVirtualClientPath(normalizedPath)) {
+    return true;
+  }
+
+  /**
+   * Next.js / Turbopack generated runtime and development assets.
+   */
+  if (
+    normalizedPath.includes('/_next/') ||
+    normalizedPath.includes('/.next/') ||
+    normalizedPath.includes('/next/dist/') ||
+    normalizedPath.includes('turbopack') ||
+    isGeneratedChunk(normalizedPath)
+  ) {
     return true;
   }
 
@@ -608,4 +623,14 @@ function unknownLocation(): SourceLocation {
     line: 0,
     column: 0,
   };
+}
+
+function isGeneratedChunk(normalizedPath: string): boolean {
+  const fileName =
+    removeQueryAndHash(normalizedPath).split('/').pop() ?? normalizedPath;
+
+  return (
+    /^_[a-z0-9]+(?:\._)?\.js$/i.test(fileName) ||
+    /^_[a-z0-9]+_\.js$/i.test(fileName)
+  );
 }
