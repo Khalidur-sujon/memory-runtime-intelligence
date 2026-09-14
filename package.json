@@ -21,24 +21,6 @@
       "import": "./dist/vite.js",
       "require": "./dist/vite.cjs",
       "default": "./dist/vite.js"
-    },
-    "./next": {
-      "types": "./dist/next.d.ts",
-      "import": "./dist/next.js",
-      "require": "./dist/next.cjs",
-      "default": "./dist/next.js"
-    },
-    "./next/runtime": {
-      "types": "./dist/next-runtime.d.ts",
-      "import": "./dist/next-runtime.js",
-      "require": "./dist/next-runtime.cjs",
-      "default": "./dist/next-runtime.js"
-    },
-    "./next/client": {
-      "types": "./dist/next-client.d.ts",
-      "import": "./dist/next-client.js",
-      "require": "./dist/next-client.cjs",
-      "default": "./dist/next-client.js"
     }
   },
   "files": [

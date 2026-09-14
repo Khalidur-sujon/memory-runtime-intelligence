@@ -43,8 +43,6 @@ export function captureSourceContext(): SourceContext {
 
     const normalizedPath = normalizePath(parsed.filePath);
 
-    console.log('[MRI STACK FRAME]', parsed.filePath);
-
     const frameType = classifyFrame(
       normalizedPath,
       parsed.lineNumber,
