@@ -1,6 +1,6 @@
 {
   "name": "memory-runtime-intelligence",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "bin": {
     "memory-runtime-intelligence": "./dist/cli.js"
   },
