@@ -139,7 +139,7 @@ export class EventListenerInstrumentation implements Instrumentation {
          *
          * Ownership comes from the COMPLETE stack.
          */
-        const { sourceLocation, owner } = captureSourceContext();
+        const { sourceLocation, owner, scriptUrl } = captureSourceContext();
 
         /**
          * Same resource type + same source location
@@ -173,6 +173,7 @@ export class EventListenerInstrumentation implements Instrumentation {
           target: this.constructor.name,
           eventType: type,
           sourceLocation,
+          scriptUrl,
         };
 
         publisher.publish(addedEvent);

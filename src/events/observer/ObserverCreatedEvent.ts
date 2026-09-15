@@ -11,4 +11,5 @@ export interface ObserverCreatedEvent extends RuntimeEvent {
   readonly sourceLocation: SourceLocation;
 
   owner: ResourceOwner;
+  scriptUrl?: string;
 }

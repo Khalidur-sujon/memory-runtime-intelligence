@@ -99,7 +99,7 @@ export class ObserverInstrumentation implements Instrumentation {
        *
        * from the complete JavaScript stack.
        */
-      const { sourceLocation, owner } = captureSourceContext();
+      const { sourceLocation, owner, scriptUrl } = captureSourceContext();
 
       /**
        * If the stack does not contain a useful application
@@ -142,6 +142,7 @@ export class ObserverInstrumentation implements Instrumentation {
         owner,
         observerType,
         sourceLocation,
+        scriptUrl,
       };
 
       publisher.publish(createdEvent);

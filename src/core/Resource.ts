@@ -1,3 +1,5 @@
+import { SourceLocation } from './SourceLocation';
+
 /**
  * Uniquely identifies a Resource within a runtime session.
  */
@@ -31,4 +33,5 @@ export interface Resource {
   readonly type: ResourceType;
   state: ResourceState;
   readonly owner: ResourceOwner;
+  readonly sourceLocation?: SourceLocation;
 }

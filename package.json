@@ -71,6 +71,7 @@
     "webpack-dev-server": "^6.0.0"
   },
   "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31",
     "jsdom": "^29.1.1",
     "ws": "^8.21.3"
   },

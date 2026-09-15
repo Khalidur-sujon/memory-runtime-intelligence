@@ -105,7 +105,7 @@ export class WebSocketInstrumentation implements Instrumentation {
          * Ownership is no longer derived from the
          * final sourceLocation.
          */
-        const { sourceLocation, owner } = captureSourceContext();
+        const { sourceLocation, owner, scriptUrl } = captureSourceContext();
 
         /**
          * Same resource type + same source location
@@ -148,6 +148,7 @@ export class WebSocketInstrumentation implements Instrumentation {
           url: String(args[0]),
           sourceLocation,
           owner,
+          scriptUrl,
         };
 
         publisher.publish(createdEvent);

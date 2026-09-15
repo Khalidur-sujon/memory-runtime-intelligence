@@ -4,6 +4,7 @@ import type { ResourceOwner } from '../core/Resource';
 export interface SourceContext {
   sourceLocation: SourceLocation;
   owner: ResourceOwner;
+  scriptUrl?: string;
 }
 
 type FrameType =
@@ -92,9 +93,16 @@ export function captureSourceContext(): SourceContext {
         column: parsed.columnNumber,
       };
 
+      const scriptUrl =
+        parsed.filePath.startsWith('http://') ||
+        parsed.filePath.startsWith('https://')
+          ? parsed.filePath
+          : undefined;
+
       return {
         sourceLocation,
         owner: frameworkDetected ? 'framework' : 'application',
+        scriptUrl,
       };
     }
   }
@@ -511,6 +519,7 @@ function parseStackLine(line: string): {
   filePath: string;
   lineNumber: number;
   columnNumber: number;
+  scriptUrl?: string;
 } | null {
   const trimmed = line.trim();
 

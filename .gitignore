@@ -8,3 +8,4 @@ coverage/
 .env.*
 !.env.example.memory-runtime/
 .memory-runtime/
+*.tgz

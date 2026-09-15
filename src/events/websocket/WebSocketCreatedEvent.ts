@@ -14,4 +14,5 @@ export interface WebSocketCreatedEvent extends RuntimeEvent {
   readonly sourceLocation: SourceLocation;
 
   owner: ResourceOwner;
+  scriptUrl?: string;
 }

@@ -14,4 +14,5 @@ export interface TimerIntervalCreatedEvent extends RuntimeEvent {
   readonly sourceLocation: SourceLocation;
 
   owner: ResourceOwner;
+  scriptUrl?: string;
 }

@@ -1,4 +1,9 @@
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
+import { loadSourceMap } from '../runtime/source-map/SourceMapLoader';
+import {
+  resolveGeneratedLocation,
+  type GeneratedLocation,
+} from '../runtime/source-map/SourceMapResolver';
 
 import type {
   RuntimeSnapshot,
@@ -15,6 +20,7 @@ export class RuntimeCollector {
   private server: WebSocketServer | undefined;
 
   private readonly sockets = new Set<WebSocket>();
+  private readonly sourceMapCache = new Map<string, Promise<unknown | null>>();
 
   private started = false;
 
@@ -132,8 +138,11 @@ export class RuntimeCollector {
     try {
       const snapshot = JSON.parse(data.toString()) as RuntimeSnapshot;
 
+      const enrichedSnapshot = await this.enrichSnapshot(snapshot);
+
       const persistedSnapshot: PersistedRuntimeSnapshot = {
-        ...snapshot,
+        // ...snapshot,
+        ...enrichedSnapshot,
         pid: process.pid,
       };
 
@@ -144,5 +153,124 @@ export class RuntimeCollector {
         error,
       );
     }
+  }
+
+  private async enrichSnapshot(
+    snapshot: RuntimeSnapshot,
+  ): Promise<RuntimeSnapshot> {
+    const sourceLocations = new Map<
+      string,
+      {
+        file: string;
+        line: number;
+        column: number;
+        scriptUrl?: string;
+      }
+    >();
+
+    for (const event of snapshot.events) {
+      if (!this.isResourceSourceEvent(event)) continue;
+
+      sourceLocations.set(event.resourceId, {
+        file: event.sourceLocation.file,
+        line: event.sourceLocation.line,
+        column: event.sourceLocation.column,
+        scriptUrl: event.scriptUrl,
+      });
+    }
+
+    const resources = await Promise.all(
+      snapshot.resources.map(async (resource) => {
+        const generatedLocation = sourceLocations.get(resource.id);
+
+        if (!generatedLocation) {
+          return resource;
+        }
+
+        // No script URL → cannot resolve source map.
+        if (!generatedLocation.scriptUrl) {
+          return {
+            ...resource,
+            sourceLocation: {
+              file: generatedLocation.file,
+              line: generatedLocation.line,
+              column: generatedLocation.column,
+            },
+          };
+        }
+
+        const sourceMap = await this.loadCachedSourceMap(
+          generatedLocation.scriptUrl,
+        );
+
+        if (!sourceMap) {
+          return {
+            ...resource,
+            sourceLocation: {
+              file: generatedLocation.file,
+              line: generatedLocation.line,
+              column: generatedLocation.column,
+            },
+          };
+        }
+
+        const resolvedLocation = resolveGeneratedLocation(sourceMap, {
+          file: generatedLocation.file,
+          line: generatedLocation.line,
+          column: generatedLocation.column,
+        });
+
+        return {
+          ...resource,
+          sourceLocation: resolvedLocation ?? {
+            file: generatedLocation.file,
+            line: generatedLocation.line,
+            column: generatedLocation.column,
+          },
+        };
+      }),
+    );
+
+    return {
+      ...snapshot,
+      resources,
+    };
+  }
+  private isResourceSourceEvent(
+    event: RuntimeSnapshot['events'][number],
+  ): event is RuntimeSnapshot['events'][number] & {
+    resourceId: string;
+
+    sourceLocation: {
+      file: string;
+      line: number;
+      column: number;
+    };
+
+    scriptUrl?: string;
+  } {
+    return (
+      'resourceId' in event &&
+      typeof event.resourceId === 'string' &&
+      'sourceLocation' in event &&
+      event.sourceLocation !== null &&
+      typeof event.sourceLocation === 'object' &&
+      'file' in event.sourceLocation &&
+      'line' in event.sourceLocation &&
+      'column' in event.sourceLocation
+    );
+  }
+  private loadCachedSourceMap(scriptUrl: string): Promise<unknown | null> {
+    const cached = this.sourceMapCache.get(scriptUrl);
+
+    if (cached) {
+      return cached;
+    }
+
+    const promise = loadSourceMap(scriptUrl);
+
+    this.sourceMapCache.set(scriptUrl, promise);
+
+    return promise;
   }
 }

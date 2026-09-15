@@ -105,7 +105,7 @@ export class TimerInstrumentation implements Instrumentation {
        *
        * separately.
        */
-      const { sourceLocation, owner } = captureSourceContext();
+      const { sourceLocation, owner, scriptUrl } = captureSourceContext();
 
       /**
        * Same resource type + same source location
@@ -148,6 +148,7 @@ export class TimerInstrumentation implements Instrumentation {
         delay: extractDelay(args),
         sourceLocation,
         owner,
+        scriptUrl,
       };
 
       publisher.publish(createdEvent);

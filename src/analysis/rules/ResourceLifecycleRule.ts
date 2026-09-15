@@ -3,15 +3,19 @@ import type { Finding } from '../Finding';
 import type { Rule } from '../Rule';
 
 import type { WebSocketCreatedEvent, WebSocketClosedEvent } from '../../events';
+
 import { ResourceType, SourceLocation } from '../../core';
 import { Confidence } from '../Confidence';
-import { EventListenerAddedEvent } from '../../events/EventListener/EventListenerAddedEvent';
-import { EventListenerRemovedEvent } from '../../events/EventListener/EventListenerRemovedEvent';
-import { TimerIntervalCreatedEvent } from '../../events/timer/TimerIntervalCreatedEvent';
-import { TimerIntervalReleasedEvent } from '../../events/timer/TimerIntervalReleasedEvent';
-import { ObserverReleasedEvent } from '../../events/observer/ObserverReleasedEvent';
-import { ObserverStartedEvent } from '../../events/observer/ObserverStartedEvent';
-import { ObserverCreatedEvent } from '../../events/observer/ObserverCreatedEvent';
+
+import type { EventListenerAddedEvent } from '../../events/EventListener/EventListenerAddedEvent';
+import type { EventListenerRemovedEvent } from '../../events/EventListener/EventListenerRemovedEvent';
+
+import type { TimerIntervalCreatedEvent } from '../../events/timer/TimerIntervalCreatedEvent';
+import type { TimerIntervalReleasedEvent } from '../../events/timer/TimerIntervalReleasedEvent';
+
+import type { ObserverReleasedEvent } from '../../events/observer/ObserverReleasedEvent';
+import type { ObserverStartedEvent } from '../../events/observer/ObserverStartedEvent';
+import type { ObserverCreatedEvent } from '../../events/observer/ObserverCreatedEvent';
 
 interface LifecycleCounter {
   created: number;
@@ -23,12 +27,26 @@ interface LifecycleCounter {
   // Resource kind (websocket, timer, etc.)
   resourceType?: ResourceType;
 
-  // First place where the resource was created
+  // First resolved source location where the resource was created
   sourceLocation?: SourceLocation;
 }
 
 export class ResourceLifecycleRule implements Rule {
   analyze(context: AnalysisContext): readonly Finding[] {
+    /**
+     * Resources contain the enriched source location after
+     * source-map resolution.
+     *
+     * Events contain the raw/generated runtime location.
+     *
+     * Therefore:
+     * - history -> lifecycle counting
+     * - resources -> developer-facing source location
+     */
+    const resourceById = new Map(
+      context.resources.map((resource) => [resource.id, resource]),
+    );
+
     const lifecycle = new Map<string, LifecycleCounter>();
 
     for (const event of context.history.getEvents()) {
@@ -43,14 +61,19 @@ export class ResourceLifecycleRule implements Rule {
 
           counter.created++;
 
-          // Save once for later recommendations
           if (!counter.resourceType) {
             counter.resourceType = 'websocket';
           }
 
-          // Keep the first creation location
+          /**
+           * Use the enriched resource location instead of the
+           * generated event location.
+           */
           if (!counter.sourceLocation) {
-            counter.sourceLocation = createdEvent.sourceLocation;
+            counter.sourceLocation = this.getResourceSourceLocation(
+              resourceById,
+              createdEvent.resourceId,
+            );
           }
 
           break;
@@ -83,12 +106,19 @@ export class ResourceLifecycleRule implements Rule {
             counter.resourceType = 'event-listener';
           }
 
+          /**
+           * Use the resolved source location stored on the resource.
+           */
           if (!counter.sourceLocation) {
-            counter.sourceLocation = addedEvent.sourceLocation;
+            counter.sourceLocation = this.getResourceSourceLocation(
+              resourceById,
+              addedEvent.resourceId,
+            );
           }
 
           break;
         }
+
         case 'EventListenerRemoved': {
           const removedEvent = event as EventListenerRemovedEvent;
 
@@ -116,12 +146,19 @@ export class ResourceLifecycleRule implements Rule {
             counter.resourceType = 'timer-interval';
           }
 
+          /**
+           * Use the resolved source location stored on the resource.
+           */
           if (!counter.sourceLocation) {
-            counter.sourceLocation = createdEvent.sourceLocation;
+            counter.sourceLocation = this.getResourceSourceLocation(
+              resourceById,
+              createdEvent.resourceId,
+            );
           }
 
           break;
         }
+
         case 'TimerIntervalReleased': {
           const releasedEvent = event as TimerIntervalReleasedEvent;
 
@@ -150,24 +187,17 @@ export class ResourceLifecycleRule implements Rule {
           }
 
           if (!counter.sourceLocation) {
-            counter.sourceLocation = createdEvent.sourceLocation;
+            counter.sourceLocation = this.getResourceSourceLocation(
+              resourceById,
+              createdEvent.resourceId,
+            );
           }
 
           break;
         }
+
         case 'ObserverStarted': {
-          const startedEvent = event as ObserverStartedEvent;
-
-          /**
-           * Started does not create a new resource.
-           *
-           * The Observer was already created before
-           * observe() was called.
-           *
-           * Therefore we do not increment created/released.
-           */
-          this.getCounter(lifecycle, startedEvent.resourceGroupId);
-
+          // Starting/observing does not create a new resource.
           break;
         }
 
@@ -191,34 +221,46 @@ export class ResourceLifecycleRule implements Rule {
     for (const [resourceGroupId, counter] of lifecycle) {
       const unreleased = counter.created - counter.released;
 
-      if (counter.created > counter.released) {
-        if (!counter.sourceLocation) {
-          continue;
-        }
-
-        findings.push({
-          resourceGroupId,
-
-          resourceType: counter.resourceType!,
-
-          message: 'Potential Memory Retention.',
-
-          confidence: this.calculateConfidence(counter),
-
-          recommendation: this.getRecommendation(counter),
-
-          details: {
-            created: counter.created,
-            released: counter.released,
-            unreleased,
-          },
-
-          sourceLocation: counter.sourceLocation,
-        });
+      if (counter.created <= counter.released) {
+        continue;
       }
+
+      /**
+       * Without a resolved source location we cannot provide
+       * a useful developer-facing finding.
+       */
+      if (!counter.sourceLocation) {
+        continue;
+      }
+
+      findings.push({
+        resourceGroupId,
+        resourceType: counter.resourceType!,
+        message: 'Potential Memory Retention.',
+        confidence: this.calculateConfidence(counter),
+        recommendation: this.getRecommendation(counter),
+        details: {
+          created: counter.created,
+          released: counter.released,
+          unreleased,
+        },
+        sourceLocation: counter.sourceLocation,
+      });
     }
 
     return findings;
+  }
+
+  /**
+   * Returns the source location stored on the enriched resource.
+   *
+   * This location has already gone through source-map resolution.
+   */
+  private getResourceSourceLocation(
+    resourceById: Map<string, AnalysisContext['resources'][number]>,
+    resourceId: string,
+  ): SourceLocation | undefined {
+    return resourceById.get(resourceId)?.sourceLocation;
   }
 
   private getCounter(
@@ -241,7 +283,6 @@ export class ResourceLifecycleRule implements Rule {
   }
 
   private calculateConfidence(counter: LifecycleCounter): Confidence {
-    // Number of unreleased resources
     const unreleased = counter.created - counter.released;
 
     if (unreleased > 1) {
@@ -252,7 +293,6 @@ export class ResourceLifecycleRule implements Rule {
   }
 
   private getRecommendation(counter: LifecycleCounter): string {
-    // Give a fix based on the resource type
     switch (counter.resourceType) {
       case 'websocket':
         return 'Call websocket.close() when the connection is no longer needed.';
