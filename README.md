@@ -536,7 +536,7 @@ A simple way to get started:
 Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Khalidur-sujon/memory-runtime-intelligence.git
 cd memory-runtime-intelligence
 ```
 
